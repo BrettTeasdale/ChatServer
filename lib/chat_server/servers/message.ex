@@ -4,8 +4,9 @@ defmodule ChatServer.Servers.Message do
 
   schema "server_channel_messages" do
     field :message, :string
-    field :user_id, :id
-    field :channel_id, :id
+
+    belongs_to :user, ChatServer.Accounts.User
+    belongs_to :channel, ChatServer.Servers.Channel
 
     timestamps(type: :utc_datetime)
   end

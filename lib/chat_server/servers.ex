@@ -7,6 +7,19 @@ defmodule ChatServer.Servers do
   alias ChatServer.Repo
 
   alias ChatServer.Servers.Server
+  alias ChatServer.Accounts.User
+
+  def server_list_topic(user_id) do
+    "server_list:#{user_id}"
+  end
+
+  def server_list_subscribe(user_id) do
+    Phoenix.PubSub.subscribe(ChatServer.PubSub, server_list_topic(user_id))
+  end
+
+  def server_list_broadcast(user_id, message) do
+    Phoenix.PubSub.broadcast(ChatServer.PubSub, server_list_topic(user_id), message)
+  end
 
   @doc """
   Returns the list of servers.
@@ -19,6 +32,19 @@ defmodule ChatServer.Servers do
   """
   def list_servers do
     Repo.all(Server)
+  end
+
+  @doc """
+  Returns the list of a user's owned and joined servers.
+
+  ## Examples
+
+      iex> list_user_servers()
+      [%Server{}, ...]
+
+  """
+  def list_user_servers(%User{} = user) do
+    
   end
 
   @doc """
@@ -37,6 +63,16 @@ defmodule ChatServer.Servers do
   """
   def get_server!(id), do: Repo.get!(Server, id)
 
+
+  @doc """
+  Creates a server that belongs to a user
+  """
+  def create_server(%User{} = user, %{} = attrs) do
+    %Server{user: user}
+    |> Server.changeset(attrs)
+    |> Repo.insert()
+  end
+
   @doc """
   Creates a server.
 
@@ -49,7 +85,7 @@ defmodule ChatServer.Servers do
       {:error, %Ecto.Changeset{}}
 
   """
-  def create_server(attrs \\ %{}) do
+  def create_server(%{} = attrs) when not is_struct(attrs, User) do
     %Server{}
     |> Server.changeset(attrs)
     |> Repo.insert()

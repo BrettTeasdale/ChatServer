@@ -6,7 +6,8 @@ defmodule ChatServer.Servers.Channel do
     field :name, :string
     field :private, :boolean, default: false
     field :description, :string
-    field :server_id, :id
+
+    belongs_to :server, ChatServer.Servers.Server
 
     timestamps(type: :utc_datetime)
   end

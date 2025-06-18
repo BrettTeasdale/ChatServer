@@ -12,6 +12,7 @@ defmodule ChatServer.Application do
       ChatServer.Repo,
       {DNSCluster, query: Application.get_env(:chat_server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ChatServer.PubSub},
+      ChatServerWeb.Presence,
       # Start the Finch HTTP client for sending emails
       {Finch, name: ChatServer.Finch},
       # Start a worker by calling: ChatServer.Worker.start_link(arg)
