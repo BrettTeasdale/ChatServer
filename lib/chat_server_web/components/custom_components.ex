@@ -30,6 +30,7 @@ defmodule ChatServerWeb.CustomComponents do
   attr :hide_event, :string, required: true
   attr :target, :any, required: true
   attr :on_cancel, JS, default: %JS{}
+  slot :header, required: false
   slot :inner_block, required: true
   def raw_modal(assigns) do
     ~H"""

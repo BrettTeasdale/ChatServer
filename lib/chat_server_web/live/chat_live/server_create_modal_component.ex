@@ -86,13 +86,15 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
     %{current_user: user } = socket.assigns
 
     case Servers.create_server(user, server_params) do
-    {:ok, _server} ->
+    {:ok, server_user} ->
       changeset = Servers.change_server(%Server{})
 
       socket = socket
       |> assign(trigger_submit: true)
       |> assign(:form, to_form(changeset))
       |> assign(:show_server_create_modal, false)
+
+      Servers.server_list_broadcast(socket.assigns.current_user.id, {:server_created, server_user})
 
       {:noreply, socket}
 

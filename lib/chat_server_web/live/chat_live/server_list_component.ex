@@ -2,45 +2,42 @@ defmodule ChatServerWeb.ChatLive.ServerListComponent do
   use ChatServerWeb, :live_component
 
   alias ChatServer.Servers;
+  alias ChatServer.Servers.ServerUser;
 
   def render(assigns) do
     ~H"""
-      <div>
-        SERVER LIST
+      <div phx-update="stream" id="server_list">
+        <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
+          {server_user.server.name}
+        </div>
       </div>
     """
   end
 
   def mount(socket) do
-    socket = socket
-    |> stream(:servers, Servers.list_servers())
+    {:ok, socket}
+  end
 
-    #%{current_user: current_user} = socket.assigns
-    IO.inspect(socket)
+  def update(%{action: :server_created, server_user: %ServerUser{} = server_user}, socket) do
+    socket = socket
+    |> stream_insert(:server_users, server_user, at: 0)
+
+    {:ok, socket}
+  end
+
+  def update(%{action: :server_removed, server_user: %ServerUser{} = server_user}, socket) do
+    socket = socket
+    |> stream_delete(:servers, server_user)
 
     {:ok, socket}
   end
 
   def update(assigns, socket) do
-
-    if connected?(socket) do
-      Servers.server_list_subscribe(assigns.current_user.id)
-    end
+    socket = socket
+    |> assign(:current_user, assigns.current_user)
+    |> stream(:server_users, Servers.list_user_servers(assigns.current_user))
 
     {:ok, socket}
   end
 
-  def handle_info({:server_created, server}, socket) do
-    socket = socket
-    |> stream_insert(:servers, server, at: 0)
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:server_removed, server}, socket) do
-    socket = socket
-    |> stream_delete(:servers, server)
-
-    {:noreply, socket}
-  end
 end

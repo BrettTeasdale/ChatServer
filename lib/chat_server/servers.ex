@@ -7,6 +7,7 @@ defmodule ChatServer.Servers do
   alias ChatServer.Repo
 
   alias ChatServer.Servers.Server
+  alias ChatServer.Servers.ServerUser
   alias ChatServer.Accounts.User
 
   def server_list_topic(user_id) do
@@ -44,7 +45,8 @@ defmodule ChatServer.Servers do
 
   """
   def list_user_servers(%User{} = user) do
-    
+    from(su in ServerUser, where: su.user_id == ^user.id, preload: [:server])
+    |> Repo.all()
   end
 
   @doc """
@@ -68,9 +70,21 @@ defmodule ChatServer.Servers do
   Creates a server that belongs to a user
   """
   def create_server(%User{} = user, %{} = attrs) do
-    %Server{user: user}
-    |> Server.changeset(attrs)
-    |> Repo.insert()
+    Repo.transaction(fn ->
+      {:ok, server} = %Server{}
+      |> Server.changeset(attrs)
+      |> Repo.insert()
+
+      {:ok, server_user} = %ServerUser{}
+      |> ServerUser.changeset(%{
+        user_id: user.id,
+        server_id: server.id
+      })
+      |> Repo.insert()
+
+      server_user
+      |> Repo.preload(:server)
+    end)
   end
 
   @doc """

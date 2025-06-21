@@ -7,7 +7,7 @@ defmodule ChatServer.Servers.Server do
     field :private, :boolean, default: false
     field :description, :string
 
-    belongs_to :user, ChatServer.Accounts.User
+    has_many :server_users, ChatServer.Servers.ServerUser
 
     timestamps(type: :utc_datetime)
   end
