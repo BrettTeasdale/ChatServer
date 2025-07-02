@@ -6,9 +6,11 @@ defmodule ChatServer.Repo.Migrations.AddServerUsersCrossReferenceTable do
       add :server_id, references(:servers)
       add :user_id, references(:users, on_delete: :nothing)
 
-      add :owner, :boolean
-      add :operator, :boolean
-      add :voiced, :boolean
+      add :owner, :boolean, default: false, null: false
+      add :operator, :boolean, default: false, null: false
+      add :voiced, :boolean, default: false, null: false
+
+      add :last_selected_channel_id, references(:server_channels, on_delete: :nothing)
 
       timestamps(type: :utc_datetime)
     end

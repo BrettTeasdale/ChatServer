@@ -28,7 +28,6 @@ defmodule ChatServerWeb.CustomComponents do
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :hide_event, :string, required: true
-  attr :target, :any, required: true
   attr :on_cancel, JS, default: %JS{}
   slot :header, required: false
   slot :inner_block, required: true
@@ -57,7 +56,6 @@ defmodule ChatServerWeb.CustomComponents do
               id={"#{@id}-container"}
               phx-window-keydown={JS.push(@hide_event)}
               phx-key="escape"
-              phx-target={@target}
               phx-click-away={JS.push(@hide_event)}
               class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
             >

@@ -5,6 +5,7 @@ defmodule ChatServer.Servers.Channel do
   schema "server_channels" do
     field :name, :string
     field :private, :boolean, default: false
+    field :is_default, :boolean, default: false
     field :description, :string
 
     belongs_to :server, ChatServer.Servers.Server
@@ -15,7 +16,7 @@ defmodule ChatServer.Servers.Channel do
   @doc false
   def changeset(channel, attrs) do
     channel
-    |> cast(attrs, [:name, :description, :private])
+    |> cast(attrs, [:name, :server_id, :description, :private, :is_default])
     |> validate_required([:name, :description, :private])
   end
 end

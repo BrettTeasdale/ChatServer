@@ -6,6 +6,7 @@ defmodule ChatServer.Repo.Migrations.CreateServerChannels do
       add :name, :string
       add :description, :text
       add :private, :boolean, default: false, null: false
+      add :is_default, :boolean, default: false, null: false
       add :server_id, references(:servers, on_delete: :nothing)
 
       timestamps(type: :utc_datetime)

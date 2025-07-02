@@ -10,7 +10,7 @@ defmodule ChatServer.Accounts.User do
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
 
-    has_many :server_users, ChatServer.Server.ServerUser
+    has_many :server_users, ChatServer.Servers.ServerUser
 
     timestamps(type: :utc_datetime)
   end

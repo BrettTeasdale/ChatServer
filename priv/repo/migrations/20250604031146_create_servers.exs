@@ -9,7 +9,5 @@ defmodule ChatServer.Repo.Migrations.CreateServers do
 
       timestamps(type: :utc_datetime)
     end
-
-    create index(:servers, [:user_id])
   end
 end
