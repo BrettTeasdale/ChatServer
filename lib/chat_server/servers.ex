@@ -119,55 +119,39 @@ defmodule ChatServer.Servers do
   Creates a server that belongs to a user
   """
   def create_server(%User{} = user, %{} = attrs) do
-    # Repo.transaction(fn ->
-    #   {:ok, server} = %Server{}
-    #   |> Server.changeset(attrs)
-    #   |> Repo.insert()
+    Repo.transaction(fn ->
+      {:ok, server} = %Server{}
+      |> Server.changeset(attrs)
+      |> Repo.insert()
 
-    #   {:ok, server_user} = %ServerUser{}
-    #   |> ServerUser.changeset(%{
-    #     user_id: user.id,
-    #     server_id: server.id
-    #   })
-    #   |> Ecto.build_assoc(:last_selected_channel, %{
-    #     name: "General",
-    #     private: false,
-    #     description: "A channel for general discussions.",
-    #     server: server
-    #   })
-    #   |> Repo.insert()
-
-    #   server_user
-    #   |> Repo.preload(:server)
-    # end)
-    {:ok, %{insert_server_user: server_user}} = Ecto.Multi.new()
-    |> Ecto.Multi.insert(:insert_server, Server.changeset(%Server{}, attrs))
-    |> Ecto.Multi.run(:insert_server_user, fn repo, %{insert_server: server} = test ->
-      repo.insert(ServerUser.changeset(%ServerUser{}, %{
-        server_id: server.id,
-        user_id: user.id
-      }))
-    end)
-    |> Ecto.Multi.run(:insert_default_channel, fn repo, %{insert_server_user: server_user} = test->
-      repo.insert(Channel.changeset(%Channel{}, %{
-        name: "General",
-        private: false,
-        description: "A channel for general discussions.",
-        server_id: server_user.server_id
-      }))
-    end)
-    |> Ecto.Multi.update(:update_last_selected_server, fn %{insert_server_user: server_user, insert_default_channel: default_channel} = test->
-      Ecto.Changeset.change(server_user, %{
-        last_selected_channel_id: default_channel.id
+      {:ok, server_user} = %ServerUser{}
+      |> ServerUser.changeset(%{
+        user_id: user.id,
+        server_id: server.id
       })
+      |> Repo.insert()
+
+        {:ok, default_channel} = Channel.changeset(%Channel{}, %{
+          name: "General",
+          private: false,
+          description: "A channel for general discussions.",
+          server_id: server_user.server_id
+      })
+      |> Repo.insert()
+
+      {:ok, server_user} = ServerUser.changeset(server_user, %{
+        last_selected_channel_id: default_channel.id,
+      })
+      |> Repo.update()
+
+      server_user = server_user
+      |> Repo.preload(:user)
+      |> Repo.preload(:server)
+
+      IO.inspect(server_user)
+
+      server_user
     end)
-    |> Repo.transaction()
-
-    server_user = server_user
-    |> Repo.preload(:user)
-    |> Repo.preload(:server)
-
-    {:ok, server_user}
   end
 
   @doc """
