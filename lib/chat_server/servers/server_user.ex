@@ -3,6 +3,10 @@ defmodule ChatServer.Servers.ServerUser do
   import Ecto.Changeset
 
   schema "server_users" do
+    field :owner, :boolean, default: false
+    field :operator, :boolean, default: false
+    field :voiced, :boolean, default: false
+
     belongs_to :server, ChatServer.Servers.Server
     belongs_to :user, ChatServer.Accounts.User
     belongs_to :last_selected_channel, ChatServer.Servers.Channel

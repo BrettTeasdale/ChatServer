@@ -24,6 +24,23 @@ defmodule ChatServer.Servers do
     Phoenix.PubSub.broadcast(ChatServer.PubSub, server_list_topic(user_id), message)
   end
 
+
+  def channel_list_topic(user_id, channel_id) do
+    "channel_list:#{user_id}:#{channel_id}"
+  end
+
+  def channel_list_subscribe(user_id, channel_id) do
+    Phoenix.PubSub.subscribe(ChatServer.PubSub, channel_list_topic(user_id, channel_id))
+  end
+
+  def channel_list_unsubscribe(user_id, channel_id) do
+    Phoenix.PubSub.unsubscribe(ChatServer.PubSub, channel_list_topic(user_id, channel_id))
+  end
+
+  def channel_list_broadcast(user_id, channel_id, message) do
+    Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, channel_id), message)
+  end
+
   @doc """
   Returns the list of servers.
 
@@ -98,6 +115,11 @@ defmodule ChatServer.Servers do
     |> Repo.one!()
   end
 
+
+  def get_channel!(channel_id) do
+    Repo.get!(Channel, channel_id)
+  end
+
   @doc """
   Gets a single server.
 
@@ -152,6 +174,15 @@ defmodule ChatServer.Servers do
 
       server_user
     end)
+  end
+
+  @doc """
+  Creates a server that belongs to a user
+  """
+  def create_channel(%ServerUser{} = server_user, %{} = attrs) do
+    {:ok, server} = %Channel{}
+    |> Channel.changeset(attrs)
+    |> Repo.insert()
   end
 
   @doc """
@@ -217,5 +248,19 @@ defmodule ChatServer.Servers do
   """
   def change_server(%Server{} = server, attrs \\ %{}) do
     Server.changeset(server, attrs)
+  end
+
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking server changes.
+
+  ## Examples
+
+      iex> change_channel(server)
+      %Ecto.Changeset{data: %Server{}}
+
+  """
+  def change_channel(%Channel{} = channel, attrs \\ %{}) do
+    Channel.changeset(channel, attrs)
   end
 end
