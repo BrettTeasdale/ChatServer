@@ -25,20 +25,22 @@ defmodule ChatServer.Servers do
   end
 
 
-  def channel_list_topic(user_id, channel_id) do
-    "channel_list:#{user_id}:#{channel_id}"
+  def channel_list_topic(user_id, server_id) do
+    "channel_list:#{user_id}:#{server_id}"
   end
 
-  def channel_list_subscribe(user_id, channel_id) do
-    Phoenix.PubSub.subscribe(ChatServer.PubSub, channel_list_topic(user_id, channel_id))
+  def channel_list_subscribe(user_id, server_id) do
+    IO.inspect("#{user_id}:#{server_id}")
+    Phoenix.PubSub.subscribe(ChatServer.PubSub, channel_list_topic(user_id, server_id))
   end
 
-  def channel_list_unsubscribe(user_id, channel_id) do
-    Phoenix.PubSub.unsubscribe(ChatServer.PubSub, channel_list_topic(user_id, channel_id))
+  def channel_list_unsubscribe(user_id, server_id) do
+    Phoenix.PubSub.unsubscribe(ChatServer.PubSub, channel_list_topic(user_id, server_id))
   end
 
-  def channel_list_broadcast(user_id, channel_id, message) do
-    Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, channel_id), message)
+  def channel_list_broadcast(user_id, server_id, message) do
+    IO.inspect("broadcast #{user_id}:#{server_id}")
+    Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, server_id), message)
   end
 
   @doc """
@@ -180,9 +182,11 @@ defmodule ChatServer.Servers do
   Creates a server that belongs to a user
   """
   def create_channel(%ServerUser{} = server_user, %{} = attrs) do
-    {:ok, server} = %Channel{}
+    {:ok, channel} = %Channel{}
     |> Channel.changeset(attrs)
     |> Repo.insert()
+
+    {:ok, Repo.preload(channel, :server)}
   end
 
   @doc """

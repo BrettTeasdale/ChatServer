@@ -3,17 +3,12 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   import ChatServerWeb.CustomComponents
 
-  alias ChatServer.Servers.Server;
-  alias ChatServer.Servers.ServerUser;
-  alias ChatServer.Servers.Channel;
-  alias ChatServer.Servers;
+  alias ChatServer.Servers.Server
+  alias ChatServer.Servers.ServerUser
+  alias ChatServer.Servers.Channel
+  alias ChatServer.Servers
 
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
-
-  # def update(assigns, socket) do
-  #   IO.inspect(assigns)
-  #   {:ok, socket}
-  # end
 
   def mount(_params, _session, socket) do
 
@@ -129,7 +124,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
       <h1>Chat View</h1>
       <div id="chat_view" phx-update="stream" id="chat_view">
-        <div :for={{dom_id, channel} <- @streams.channels} id={dom_id} class="channel_view">
+        <div :for={{dom_id, channel} <- @streams.channels} id={dom_id} class={"channel_view" <> if channel.id != Map.get(@selected_channel, :id), do: " hidden", else: ""}>
           Channel Name: {channel.name}
           <br>Selected: {channel.id == Map.get(@selected_channel, :id)}
         </div>
@@ -253,6 +248,11 @@ defmodule ChatServerWeb.ChatLive.Index do
     {:noreply, stream_insert(socket, :server_users, server_user, at: 0)}
   end
 
+  def handle_info({:channel_created, %Channel{} = channel}, socket) do
+    {:noreply, stream_insert(socket, :channels, channel, at: 0)}
+  end
+
+
   def handle_info({:server_removed, %ServerUser{} = server_user}, socket) do
     {:noreply, stream_delete(socket, :servers, server_user)}
   end
@@ -264,7 +264,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     # Unsubcribe from the previous selected server user's channels
     if Map.get(previous_selected_server_user, :id) do
-      unsubscribe_from_server_channels(socket, Servers.list_server_user_channels(previous_selected_server_user))
+      Servers.channel_list_unsubscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
     end
 
     server_user = Servers.get_server_user!(server_user_id)
@@ -283,10 +283,9 @@ defmodule ChatServerWeb.ChatLive.Index do
       socket
     end
 
-    # Subscribe to new selected server user's channels
-    subscribe_to_server_channels(socket, channels)
+    Servers.channel_list_subscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
 
-    IO.inspect(server_user);
+    IO.inspect(server_user)
 
     {:noreply, socket}
   end
@@ -304,22 +303,5 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> stream_insert(:channels, channel)
 
     {:noreply, socket}
-  end
-
-
-  defp subscribe_to_server_channels(socket, channels) do
-    if connected?(socket) do
-      for channel <- channels do
-        Servers.channel_list_subscribe(socket.assigns.current_user.id, channel.id)
-      end
-    end
-  end
-
-  defp unsubscribe_from_server_channels(socket, channels) do
-    if connected?(socket) do
-      for channel <- channels do
-        Servers.channel_list_unsubscribe(socket.assigns.current_user.id, channel.id)
-      end
-    end
   end
 end
