@@ -32,13 +32,62 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def render(assigns) do
     ~H"""
+
+    <div class="flex flex-row h-screen p-0 m-0">
+      <div class="h-full w-40 overflow-y-scroll">
+        <div>
+          <.button phx-click="show_server_create_modal">Create Server</.button>
+        </div>
+        <div phx-update="stream" id="server_list">
+          <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
+            <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={if server_user.id == @selected_server_user.id do "selected" end}>
+              {server_user.server.name}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col w-80 h-screen m-0 overflow-y-scroll">
+        <div :if={Map.get(@selected_server_user, :id)}>
+          <.button phx-click="show_channel_create_modal">Create Channel</.button>
+        </div>
+        <div class="flex-1" id="channel_list" phx-update="stream">
+          <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
+            <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
+              # {channel.name}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col w-full h-screen">
+        <div class="flex flex-row">
+          <div>
+            <h3># {@selected_channel.name}</h3>
+          </div>
+          <div>
+            <input type="text" name="query" value="" placeholder="Search..." />
+          </div>
+        </div>
+
+        <div phx-update="stream" id="chat_view">
+          <div :for={{dom_id, channel} <- @streams.channels} id={dom_id} class={"channel_view" <> if channel.id != Map.get(@selected_channel, :id), do: " hidden", else: ""}>
+            Channel Name: {channel.name}
+            <br>Selected: {channel.id == Map.get(@selected_channel, :id)}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div>
+
+      <!--
       CHAT APP
 
       <div>
         <.button phx-click="show_server_create_modal">Create Server</.button>
-        <.button :if={Map.get(@selected_server_user, :id)} phx-click="show_channel_create_modal">Create Channel</.button>
       </div>
+      -->
 
       <.raw_modal :if={@show_server_create_modal} show={@show_server_create_modal} id="server-create-modal" hide_event="hide_server_create_modal">
         <:header>Create New Server</:header>
@@ -103,7 +152,7 @@ defmodule ChatServerWeb.ChatLive.Index do
           </div>
         </.simple_form>
       </.raw_modal>
-
+      <!--
       <h1>Servers</h1>
       <div phx-update="stream" id="server_list">
         <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
@@ -132,6 +181,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
       User List
 
+      -->
     </div>
     """
   end

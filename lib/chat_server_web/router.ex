@@ -13,6 +13,16 @@ defmodule ChatServerWeb.Router do
     plug :fetch_current_user
   end
 
+  pipeline :chat do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {ChatServerWeb.Layouts, :chat_root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+    plug :fetch_current_user
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -48,12 +58,13 @@ defmodule ChatServerWeb.Router do
 
   # Chat Routes
 
-  scope "/", ChatServerWeb do
-    pipe_through [:browser, :require_authenticated_user]
+  scope "/chat", ChatServerWeb do
+    pipe_through [:chat, :require_authenticated_user]
 
     live_session :require_authenticated_user_chat,
-      on_mount: [{ChatServerWeb.UserAuth, :ensure_authenticated}] do
-      live "/chat", ChatLive.Index
+      layout: {ChatServerWeb.Layouts,
+      :chat_app}, on_mount: [{ChatServerWeb.UserAuth, :ensure_authenticated}] do
+      live "/", ChatLive.Index
     end
   end
 
