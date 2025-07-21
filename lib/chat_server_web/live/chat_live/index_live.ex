@@ -6,6 +6,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   alias ChatServer.Servers.Server
   alias ChatServer.Servers.ServerUser
   alias ChatServer.Servers.Channel
+  alias ChatServer.Servers.Message
   alias ChatServer.Servers
 
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
@@ -16,78 +17,105 @@ defmodule ChatServerWeb.ChatLive.Index do
       Servers.server_list_subscribe(socket.assigns.current_user.id)
     end
 
+    channels = Servers.list_server_user_channels(%ServerUser{})
+
     socket = socket
     |> assign(check_errors: false)
     |> assign(:server_create_form, to_form(Servers.change_server(%Server{})))
     |> assign(:channel_create_form, to_form(Servers.change_channel(%Channel{})))
+    |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:show_server_create_modal, false)
     |> assign(:show_channel_create_modal, false)
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
     |> stream(:server_users, Servers.list_user_servers(socket.assigns.current_user))
-    |> stream(:channels, Servers.list_server_user_channels(%ServerUser{}))
+    |> stream(:channels, channels)
+    |> assign(:channels, channels)
 
     {:ok, socket}
   end
 
   def render(assigns) do
     ~H"""
-
-    <div class="flex flex-row h-screen p-0 m-0">
-      <div class="h-full w-40 overflow-y-scroll">
-        <div>
-          <.button phx-click="show_server_create_modal">Create Server</.button>
-        </div>
-        <div phx-update="stream" id="server_list">
-          <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
-            <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={if server_user.id == @selected_server_user.id do "selected" end}>
-              {server_user.server.name}
-            </button>
-          </div>
-        </div>
+    <div class="flex flex-col w-screen h-screen p-0 m-0">
+      <div class="w-full text-center" :if={@selected_server_user.id}>
+        {@selected_server_user.server.name}
       </div>
-
-      <div class="flex flex-col w-80 h-screen m-0 overflow-y-scroll">
-        <div :if={Map.get(@selected_server_user, :id)}>
-          <.button phx-click="show_channel_create_modal">Create Channel</.button>
-        </div>
-        <div class="flex-1" id="channel_list" phx-update="stream">
-          <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
-            <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
-              # {channel.name}
-            </button>
-          </div>
-        </div>
+      <div class="w-full text-center" :if={!@selected_server_user.id}>
+        Select a Server
       </div>
-
-      <div class="flex flex-col w-full h-screen">
-        <div class="flex flex-row">
+      <div class="flex flex-row h-full p-0 m-0">
+        <div class="h-full w-40 overflow-y-scroll">
           <div>
-            <h3># {@selected_channel.name}</h3>
+            <.button phx-click="show_server_create_modal">Create Server</.button>
           </div>
-          <div>
-            <input type="text" name="query" value="" placeholder="Search..." />
+          <div phx-update="stream" id="server_list">
+            <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
+              <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={if server_user.id == @selected_server_user.id do "selected" end}>
+                {server_user.server.name}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div phx-update="stream" id="chat_view">
-          <div :for={{dom_id, channel} <- @streams.channels} id={dom_id} class={"channel_view" <> if channel.id != Map.get(@selected_channel, :id), do: " hidden", else: ""}>
-            Channel Name: {channel.name}
-            <br>Selected: {channel.id == Map.get(@selected_channel, :id)}
+        <div class="flex flex-col w-80 h-full m-0 overflow-y-scroll">
+          <div :if={Map.get(@selected_server_user, :id)}>
+            <.button phx-click="show_channel_create_modal">Create Channel</.button>
+          </div>
+          <div class="flex-1" id="channel_list" phx-update="stream">
+            <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
+              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
+                # {channel.name}
+              </button>
+            </div>
           </div>
         </div>
+
+        <div class="flex flex-col w-full h-full">
+          <div class="flex flex-row">
+            <div class="flex-1">
+              <h3># {@selected_channel.name}</h3>
+            </div>
+            <div class="mr-8">
+              <input type="text" name="query" value="" placeholder="Search..." />
+            </div>
+          </div>
+          <%= for channel <- @channels do %>
+            <div class={["flex flex-col h-full channel_view", (if channel.id != Map.get(@selected_channel, :id), do: "hidden", else: "")]}>
+              <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"}>
+                <% IO.inspect(@streams["messages_#{channel.id}"], label: "streams3") %>
+                <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id}>
+                  <div class="font-semibold">
+                    {message.user.username}
+                  </div>
+                  <div class="w-full">
+                    {message.message}
+                  </div>
+                </div>
+              </div>
+              <div class="w-full">
+                <form
+                  class="flex flex-row w-full m-0 p-0"
+                  id="server_create_form"
+                  phx-submit="send_message"
+                  phx-value-channel-id={@selected_channel.id}
+                >
+                  <div class="flex-1 m-0">
+                    <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
+                    <input type="text" name="message[message]" id="message" class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400" placeholder="Message">
+                  </div>
+                  <div class="w-32 m-0">
+                    <.button class="w-32 m-0">Send Message</.button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
       </div>
     </div>
-
     <div>
-
-      <!--
-      CHAT APP
-
-      <div>
-        <.button phx-click="show_server_create_modal">Create Server</.button>
-      </div>
-      -->
 
       <.raw_modal :if={@show_server_create_modal} show={@show_server_create_modal} id="server-create-modal" hide_event="hide_server_create_modal">
         <:header>Create New Server</:header>
@@ -152,36 +180,6 @@ defmodule ChatServerWeb.ChatLive.Index do
           </div>
         </.simple_form>
       </.raw_modal>
-      <!--
-      <h1>Servers</h1>
-      <div phx-update="stream" id="server_list">
-        <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
-          <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={if server_user.id == @selected_server_user.id do "selected" end}>
-            {server_user.server.name}
-          </button>
-        </div>
-      </div>
-
-      <h1>Channels</h1>
-      <div phx-update="stream" id="channel_list">
-        <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
-          <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
-            {channel.name}
-          </button>
-        </div>
-      </div>
-
-      <h1>Chat View</h1>
-      <div id="chat_view" phx-update="stream" id="chat_view">
-        <div :for={{dom_id, channel} <- @streams.channels} id={dom_id} class={"channel_view" <> if channel.id != Map.get(@selected_channel, :id), do: " hidden", else: ""}>
-          Channel Name: {channel.name}
-          <br>Selected: {channel.id == Map.get(@selected_channel, :id)}
-        </div>
-      </div>
-
-      User List
-
-      -->
     </div>
     """
   end
@@ -246,7 +244,7 @@ defmodule ChatServerWeb.ChatLive.Index do
       changeset = Servers.change_server(%Server{})
 
       socket = socket
-      |> assign(:form, to_form(changeset))
+      |> assign(:server_create_form, to_form(changeset))
       |> assign(:show_server_create_modal, false)
 
       IO.inspect(server_user)
@@ -257,7 +255,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
      {:error, changeset} ->
       socket = socket
-      |> assign(:form, to_form(changeset))
+      |> assign(:server_create_form, to_form(changeset))
       |> assign(:check_errors, true)
 
       {:noreply, socket}
@@ -266,8 +264,6 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def handle_event("channel_create_modal_save", %{"channel" => channel_params}, socket) do
     %{selected_server_user: selected_server_user } = socket.assigns
-
-    channel_params = Map.put(channel_params, "server_id", selected_server_user.server_id)
 
     case Servers.create_channel(selected_server_user, channel_params) do
     {:ok, channel} ->
@@ -285,7 +281,33 @@ defmodule ChatServerWeb.ChatLive.Index do
 
      {:error, changeset} ->
       socket = socket
-      |> assign(:form, to_form(changeset))
+      |> assign(:channel_create_form, to_form(changeset))
+      |> assign(:check_errors, true)
+
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("send_message", %{"message" => message_params, "channel-id" => channel_id}, socket) do
+    %{current_user: user } = socket.assigns
+
+    #message_params = Map.put(message_params, "channel_id", channel_id)
+    #|> Map.put(message_params, "user_id", user.id)
+
+    case Servers.create_message(user, Servers.get_channel!(channel_id), message_params) do
+    {:ok, message} ->
+      changeset = Servers.change_message(%Message{})
+
+      socket = socket
+      |> assign(:message_form, to_form(changeset))
+
+      Servers.chat_broadcast(channel_id, {:message_created, message})
+
+      {:noreply, socket}
+
+     {:error, changeset} ->
+      socket = socket
+      |> assign(:message_form, to_form(changeset))
       |> assign(:check_errors, true)
 
       {:noreply, socket}
@@ -295,13 +317,16 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Handle broadcasts of PubSub events for the server list
 
   def handle_info({:server_created, %ServerUser{} = server_user}, socket) do
-    {:noreply, stream_insert(socket, :server_users, server_user, at: 0)}
+    {:noreply, stream_insert(socket, :server_users, server_user, at: -1)}
   end
 
   def handle_info({:channel_created, %Channel{} = channel}, socket) do
-    {:noreply, stream_insert(socket, :channels, channel, at: 0)}
+    {:noreply, stream_insert(socket, :channels, channel, at: -1)}
   end
 
+  def handle_info({:message_created, %Message{} = message}, socket) do
+    {:noreply, stream_insert(socket, "messages_#{message.channel.id}", message, at: -1, limit: -10)}
+  end
 
   def handle_info({:server_removed, %ServerUser{} = server_user}, socket) do
     {:noreply, stream_delete(socket, :servers, server_user)}
@@ -315,6 +340,9 @@ defmodule ChatServerWeb.ChatLive.Index do
     # Unsubcribe from the previous selected server user's channels
     if Map.get(previous_selected_server_user, :id) do
       Servers.channel_list_unsubscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
+
+      previous_channels = Servers.list_server_user_channels(previous_selected_server_user)
+      for previous_channel <- previous_channels, do: Servers.chat_unsubscribe(previous_channel.id)
     end
 
     server_user = Servers.get_server_user!(server_user_id)
@@ -326,6 +354,11 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:selected_channel, server_user.last_selected_channel)
     |> stream_insert(:server_users, server_user)
     |> stream(:channels, channels, reset: true)
+    |> assign(:channels, channels)
+
+    socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
+      stream(acc_socket, "messages_#{channel.id}", Servers.list_latest_channel_messages(channel), reset: true, limit: -10)
+    end)
 
     socket = if Map.get(previous_selected_server_user, :id) do
       stream_insert(socket, :server_users, previous_selected_server_user)
@@ -334,6 +367,8 @@ defmodule ChatServerWeb.ChatLive.Index do
     end
 
     Servers.channel_list_subscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
+
+    for channel <- channels, do: Servers.chat_subscribe(channel.id)
 
     IO.inspect(server_user)
 
@@ -346,6 +381,8 @@ defmodule ChatServerWeb.ChatLive.Index do
     previous_selected_channel = socket.assigns.selected_channel
 
     channel = Servers.get_channel!(channel_id)
+
+    IO.inspect(channel)
 
     socket = socket
     |> assign(:selected_channel, channel)

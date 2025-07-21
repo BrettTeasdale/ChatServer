@@ -10,6 +10,7 @@ defmodule ChatServer.Servers do
   alias ChatServer.Servers.Server
   alias ChatServer.Servers.ServerUser
   alias ChatServer.Servers.Channel
+  alias ChatServer.Servers.Message
   alias ChatServer.Accounts.User
 
   def server_list_topic(user_id) do
@@ -30,7 +31,6 @@ defmodule ChatServer.Servers do
   end
 
   def channel_list_subscribe(user_id, server_id) do
-    IO.inspect("#{user_id}:#{server_id}")
     Phoenix.PubSub.subscribe(ChatServer.PubSub, channel_list_topic(user_id, server_id))
   end
 
@@ -39,8 +39,24 @@ defmodule ChatServer.Servers do
   end
 
   def channel_list_broadcast(user_id, server_id, message) do
-    IO.inspect("broadcast #{user_id}:#{server_id}")
     Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, server_id), message)
+  end
+
+
+  def chat_topic(channel_id) do
+    "channel:#{channel_id}"
+  end
+
+  def chat_subscribe(channel_id) do
+    Phoenix.PubSub.subscribe(ChatServer.PubSub, chat_topic(channel_id))
+  end
+
+  def chat_unsubscribe(channel_id) do
+    Phoenix.PubSub.unsubscribe(ChatServer.PubSub, chat_topic(channel_id))
+  end
+
+  def chat_broadcast(channel_id, message) do
+    Phoenix.PubSub.broadcast(ChatServer.PubSub, chat_topic(channel_id), message)
   end
 
   @doc """
@@ -70,6 +86,32 @@ defmodule ChatServer.Servers do
     |> Repo.all()
   end
 
+  @doc """
+  Returns the list of a channel's latest messages
+
+  ## Examples
+
+      iex> list_latest_channel_messages($)
+      [%Server{}, ...]
+
+  """
+  def list_latest_channel_messages(%Channel{id: nil}) do
+    []
+  end
+
+@doc """
+  Returns the list of a channel's latest messages
+
+  ## Examples
+
+      iex> list_latest_channel_messages($)
+      [%Server{}, ...]
+
+  """
+  def list_latest_channel_messages(%Channel{} = channel) do
+    from(m in Message, where: m.channel_id == ^channel.id, preload: [:user], limit: ^100)
+    |> Repo.all()
+  end
 
   @doc """
   Returns the list of a channels a user belongs to.
@@ -179,14 +221,34 @@ defmodule ChatServer.Servers do
   end
 
   @doc """
-  Creates a server that belongs to a user
+  Creates a channel that belongs to a server
   """
   def create_channel(%ServerUser{} = server_user, %{} = attrs) do
+    attrs = Map.put(attrs, "server_id", server_user.server_id)
+
     {:ok, channel} = %Channel{}
     |> Channel.changeset(attrs)
     |> Repo.insert()
 
     {:ok, Repo.preload(channel, :server)}
+  end
+
+  @doc """
+  Creates a message that belongs to a user
+  """
+  def create_message(%User{} = user, %Channel{} = channel, %{} = attrs) do
+    attrs = Map.put(attrs, "channel_id", channel.id)
+    |> Map.put("user_id", user.id)
+
+    {:ok, message} = %Message{}
+    |> Message.changeset(attrs)
+    |> Repo.insert()
+
+    message = message
+    |> Repo.preload(:user)
+    |> Repo.preload(:channel)
+
+    {:ok, message}
   end
 
   @doc """
@@ -254,6 +316,18 @@ defmodule ChatServer.Servers do
     Server.changeset(server, attrs)
   end
 
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking message changes.
+
+  ## Examples
+
+      iex> change_message(message)
+      %Ecto.Changeset{data: %Message{}}
+
+  """
+  def change_message(%Message{} = message, attrs \\ %{}) do
+    Message.changeset(message, attrs)
+  end
 
   @doc """
   Returns an `%Ecto.Changeset{}` for tracking server changes.
