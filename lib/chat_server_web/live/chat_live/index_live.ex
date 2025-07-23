@@ -24,11 +24,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     socket = socket
     |> assign(check_errors: false)
-    |> assign(:server_create_form, to_form(Servers.change_server(%Server{})))
-    |> assign(:channel_create_form, to_form(Servers.change_channel(%Channel{})))
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
-    |> assign(:show_server_create_modal, false)
-    |> assign(:show_channel_create_modal, false)
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
     |> stream(:server_users, Servers.list_user_servers(socket.assigns.current_user))
