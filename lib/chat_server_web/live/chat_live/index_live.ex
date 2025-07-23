@@ -9,6 +9,9 @@ defmodule ChatServerWeb.ChatLive.Index do
   alias ChatServer.Servers.Message
   alias ChatServer.Servers
 
+  alias ChatServerWeb.ChatLive.ServerCreateModalComponent
+  alias ChatServerWeb.ChatLive.ChannelCreateModalComponent
+
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
 
   def mount(_params, _session, socket) do
@@ -111,75 +114,15 @@ defmodule ChatServerWeb.ChatLive.Index do
               </div>
             </div>
           <% end %>
+          </div>
         </div>
-
       </div>
-    </div>
     <div>
 
-      <.raw_modal :if={@show_server_create_modal} show={@show_server_create_modal} id="server-create-modal" hide_event="hide_server_create_modal">
-        <:header>Create New Server</:header>
-        <.simple_form
-          for={@server_create_form}
-          id="server_create_form"
-          phx-submit="server_create_modal_save"
-          phx-change="server_create_modal_validate"
-        >
-          <.error :if={@check_errors}>
-            Oops, something went wrong! Please check the errors below.
-          </.error>
+    <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
 
-          <.input field={@server_create_form[:name]} type="text" label="Server Name" required />
+    <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} />
 
-          <label class="block text-sm font-semibold leading-6 text-zinc-800">Attributes</label>
-
-          <.input field={@server_create_form[:private]} type="checkbox" label="Private" />
-
-          <.input field={@server_create_form[:description]} type="textarea" label="Description" required />
-
-          <div class="flex shrink-0 flex-wrap items-center pt-4 justify-end">
-            <button phx-click="hide_server_create_modal" class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
-            <.button class="rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2">
-              Confirm
-            </.button>
-          </div>
-        </.simple_form>
-      </.raw_modal>
-
-      <.raw_modal :if={@show_channel_create_modal} show={@show_channel_create_modal} id="channel-create-modal" hide_event="hide_channel_create_modal">
-        <:header>Create New Channel</:header>
-        <.simple_form
-          for={@channel_create_form}
-          id="channel_create_form"
-          phx-submit="channel_create_modal_save"
-          phx-change="channel_create_modal_validate"
-        >
-          <.error :if={@check_errors}>
-            Oops, something went wrong! Please check the errors below.
-          </.error>
-
-          <.input field={@channel_create_form[:name]} type="text" label="Channel Name" required />
-
-          <label class="block text-sm font-semibold leading-6 text-zinc-800">Attributes</label>
-
-          <.input field={@channel_create_form[:needs_owner]} type="checkbox" label="Requires Owner" />
-
-          <.input field={@channel_create_form[:needs_operator]} type="checkbox" label="Requires Operator" />
-
-          <.input field={@channel_create_form[:needs_voiced]} type="checkbox" label="Requires Voiced" />
-
-          <.input field={@channel_create_form[:is_default]} type="checkbox" label="Is Default" />
-
-          <.input field={@channel_create_form[:description]} type="textarea" label="Description" required />
-
-          <div class="flex shrink-0 flex-wrap items-center pt-4 justify-end">
-            <button phx-click="hide_channel_create_modal" class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
-            <.button class="rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2">
-              Confirm
-            </.button>
-          </div>
-        </.simple_form>
-      </.raw_modal>
     </div>
     """
   end
@@ -187,105 +130,13 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Handle Server Create Modal Events
 
   def handle_event("show_server_create_modal", _, socket) do
-    {:noreply, assign(socket, :show_server_create_modal, true)}
+    send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
+    {:noreply, socket}
   end
 
   def handle_event("show_channel_create_modal", _, socket) do
-    {:noreply, assign(socket, :show_channel_create_modal, true)}
-  end
-
-  def handle_event("hide_server_create_modal", _, socket) do
-    {:noreply, assign(socket, :show_server_create_modal, false)}
-  end
-
-  def handle_event("hide_channel_create_modal", _, socket) do
-    {:noreply, assign(socket, :show_channel_create_modal, false)}
-  end
-
-  def handle_info(:hide_server_create_modal, socket) do
-    {:noreply, assign(socket, :show_server_create_modal, false)}
-  end
-
-  def handle_event("server_create_modal_validate", %{"server" => server_params}, socket) do
-    changeset = Servers.change_server(%Server{}, server_params)
-
-    socket = socket
-    |> assign(:server_create_form, to_form(changeset, actions: :validate))
-
-    case changeset.valid? do
-      true ->
-        assign(socket, :check_errors, false)
-        {:noreply, socket}
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("channel_create_modal_validate", %{"channel" => server_params} = test, socket) do
-    changeset = Servers.change_channel(%Channel{}, server_params)
-
-    socket = socket
-    |> assign(:channel_create_form, to_form(changeset, actions: :validate))
-
-    case changeset.valid? do
-      true ->
-        assign(socket, :check_errors, false)
-        {:noreply, socket}
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("server_create_modal_save", %{"server" => server_params}, socket) do
-    %{current_user: user } = socket.assigns
-
-    case Servers.create_server(user, server_params) do
-    {:ok, server_user} ->
-      changeset = Servers.change_server(%Server{})
-
-      socket = socket
-      |> assign(:server_create_form, to_form(changeset))
-      |> assign(:show_server_create_modal, false)
-
-      IO.inspect(server_user)
-
-      Servers.server_list_broadcast(socket.assigns.current_user.id, {:server_created, server_user})
-
-      {:noreply, socket}
-
-     {:error, changeset} ->
-      socket = socket
-      |> assign(:server_create_form, to_form(changeset))
-      |> assign(:check_errors, true)
-
-      {:noreply, socket}
-    end
-  end
-
-  def handle_event("channel_create_modal_save", %{"channel" => channel_params}, socket) do
-    %{selected_server_user: selected_server_user } = socket.assigns
-
-    case Servers.create_channel(selected_server_user, channel_params) do
-    {:ok, channel} ->
-      changeset = Servers.change_channel(%Channel{})
-
-      socket = socket
-      |> assign(:channel_create_form, to_form(changeset))
-      |> assign(:show_channel_create_modal, false)
-
-      IO.inspect(channel)
-
-      Servers.channel_list_broadcast(socket.assigns.current_user.id, selected_server_user.server_id, {:channel_created, channel})
-
-      {:noreply, socket}
-
-     {:error, changeset} ->
-      socket = socket
-      |> assign(:channel_create_form, to_form(changeset))
-      |> assign(:check_errors, true)
-
-      {:noreply, socket}
-    end
+    send_update(ChannelCreateModalComponent, id: "chat_channel_create_form", action: :show_channel_create_modal, selected_server_user: socket.assigns.selected_server_user)
+    {:noreply, socket}
   end
 
   def handle_event("send_message", %{"message" => message_params, "channel-id" => channel_id}, socket) do

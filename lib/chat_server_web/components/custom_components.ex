@@ -26,19 +26,15 @@ defmodule ChatServerWeb.CustomComponents do
 
   """
   attr :id, :string, required: true
-  attr :show, :boolean, default: false
   attr :hide_event, :string, required: true
+  attr :target, :any, required: false
   attr :on_cancel, JS, default: %JS{}
   slot :header, required: false
   slot :inner_block, required: true
   def raw_modal(assigns) do
     ~H"""
     <div
-      :if={@show}
       id={@id}
-      phx-mounted={@show && show_modal(@id)}
-      phx-remove={hide_modal(@id)}
-      data-cancel={JS.exec(@on_cancel, "phx-remove")}
       class="relative z-50"
     >
       <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
@@ -57,6 +53,7 @@ defmodule ChatServerWeb.CustomComponents do
               phx-window-keydown={JS.push(@hide_event)}
               phx-key="escape"
               phx-click-away={JS.push(@hide_event)}
+              phx-target={@target}
               class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
             >
               <div :if={@header} class="flex shrink-0 items-center pb-4 text-xl font-medium text-slate-800">
