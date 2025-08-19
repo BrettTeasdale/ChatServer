@@ -114,9 +114,27 @@ defmodule ChatServerWeb.ChatLive.Index do
       </div>
     <div>
 
-    <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
+    <.modal :if={@action == "create_server"} id="create_server" show>
+      <%
+      # Putting the show/hide logic in the component itself complicates things
+      # since you need to pass a lot of messages back and forward.
+      # 
+      # I would set an assign that conditionally shows the modal like above
+      # 
+      # <.link patch={~p"/chat?action=create_server"}>Create Server</.link>
+      # 
+      # and then you can handle it in your handle_params
+      # 
+      # def handle_params(params, _, socket) do
+      #   {:noreply, assign(socket, :action, params["action"])}
+      # end
+      %>
+      <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
+    </.modal>
 
-    <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} />
+    <.modal :if={@action == "create_modal"} id="create_modal" show>
+      <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} />
+    </.modal>
 
     </div>
     """
