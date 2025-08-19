@@ -150,8 +150,7 @@ defmodule ChatServer.Servers do
   """
   def get_server_user!(server_user_id) do
     Repo.get!(ServerUser, server_user_id)
-    |> Repo.preload(:last_selected_channel)
-    |> Repo.preload(:server)
+    |> Repo.preload([:last_selected_channel, :server])
   end
 
   def get_server_default_channel!(server_id) do
