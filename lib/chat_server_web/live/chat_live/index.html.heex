@@ -1,101 +1,126 @@
 <div class="flex flex-col w-screen h-screen p-0 m-0">
-  <div class="w-full text-center" :if={@selected_server_user.id}>
-    {@selected_server_user.server.name}
+  <div class="w-full text-center text-2xl py-4 font-bold">
+    <span :if={@selected_server_user}>
+      Welcome to {@selected_server_user.server.name}
+    </span>
+    <span :if={!@selected_server_user}>
+      Select a server
+    </span>
   </div>
-  <div class="w-full text-center" :if={!@selected_server_user.id}>
-    Select a Server
-  </div>
-  <div class="flex flex-row h-full p-0 m-0">
-    <div class="h-full w-40 overflow-y-scroll">
-      <div>
-        <.button phx-click="show_server_create_modal">Create Server</.button>
+  <div class="flex flex-row h-full p-0 m-0 divide-x">
+    <div class="h-full w-64 overflow-y-scroll">
+      <div class="flex justify-center">
+        <.link patch={~p"/chat?action=create_server"} class="underline mb-4">Create Server</.link>
       </div>
-      <div phx-update="stream" id="server_list">
-        <div :for={server_user <- @server_users}>
-          <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={server_user.id == @selected_server_user.id && "selected"}>
-            {server_user.server.name}
-          </button>
-        </div>
+      <div id="server_list" class="px-2 space-y-2">
+        <button
+          :for={server_user <- @server_users}
+          phx-click="select_server_user"
+          phx-value-server-user-id={server_user.id}
+          class={[
+            "block text-left w-full px-2 py-1 cursor-pointer hover:underline",
+            @selected_server_user && @selected_server_user.id == server_user.id && "bg-gray-100"
+          ]}
+        >
+          {server_user.server.name}
+        </button>
       </div>
     </div>
 
     <div class="flex flex-col w-80 h-full m-0 overflow-y-scroll">
-      <div :if={Map.get(@selected_server_user, :id)}>
-        <.button phx-click="show_channel_create_modal">Create Channel</.button>
+      <div :if={@selected_server_user} class="flex justify-center">
+        <.link patch={~p"/chat?action=create_channel"} class="underline mb-4">
+          Create Channel
+        </.link>
       </div>
-      <div class="flex-1" id="channel_list" phx-update="stream">
-        <div :for={channel <- @channels}>
-          <button phx-click="select_channel" phx-value-channel-id={channel.id} class={channel.id == @selected_channel.id && "selected"}>
-            # {channel.name}
-          </button>
-        </div>
+      <div class="px-2 space-y-2" id="channel_list">
+        <button
+          :for={channel <- @channels}
+          phx-click="select_channel"
+          phx-value-channel-id={channel.id}
+          class={[
+            "block text-left w-full px-2 py-1 cursor-pointer hover:underline",
+            @selected_channel && @selected_channel.id == channel.id && "bg-gray-100"
+          ]}
+        >
+          # {channel.name}
+        </button>
       </div>
     </div>
 
-    <div class="flex flex-col w-full h-full">
+    <div :if={@selected_channel} class="flex flex-col w-full h-full">
       <div class="flex flex-row">
         <div class="flex-1">
-          <h3># {@selected_channel.name}</h3>
+          <h3>Chatting in #{@selected_channel.name}</h3>
         </div>
         <div class="mr-8">
           <input type="text" name="query" value="" placeholder="Search..." />
         </div>
       </div>
-      <%= for channel <- @channels do %>
-        <div class={["flex flex-col h-full channel_view", (if channel.id != Map.get(@selected_channel, :id), do: "hidden", else: "")]}>
-          <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"}>
-            <% IO.inspect(@streams["messages_#{channel.id}"], label: "streams3") %>
-            <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id}>
-              <div class="font-semibold">
-                {message.user.username}
-              </div>
-              <div class="w-full">
-                {message.message}
-              </div>
+      <div
+        :for={channel <- @channels}
+        class={[
+          "flex flex-col h-full channel_view",
+          if(channel.id != Map.get(@selected_channel, :id), do: "hidden", else: "")
+        ]}
+      >
+        <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"}>
+          <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id}>
+            <div class="font-semibold">
+              {message.user.username}
+            </div>
+            <div class="w-full">
+              {message.message}
             </div>
           </div>
-          <div class="w-full">
-            <form
-              class="flex flex-row w-full m-0 p-0"
-              id="server_create_form"
-              phx-submit="send_message"
-              phx-value-channel-id={@selected_channel.id}
-            >
-              <div class="flex-1 m-0">
-                <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
-                <input type="text" name="message[message]" id="message" class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400" placeholder="Message">
-              </div>
-              <div class="w-32 m-0">
-                <.button class="w-32 m-0">Send Message</.button>
-              </div>
-            </form>
-          </div>
         </div>
-      <% end %>
+        <div class="w-full">
+          <form
+            class="flex flex-row w-full m-0 p-0"
+            id="server_create_form"
+            phx-submit="send_message"
+            phx-value-channel-id={@selected_channel.id}
+          >
+            <div class="flex-1 m-0">
+              <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
+              <input
+                type="text"
+                name="message[message]"
+                id="message"
+                class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                placeholder="Message"
+              />
+            </div>
+            <div class="w-32 m-0">
+              <.button class="w-32 m-0">Send Message</.button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
-<div>
+</div>
 
-<.modal :if={@action == "create_server"} id="create_server" show>
-  <%
-  # Putting the show/hide logic in the component itself complicates things
-  # since you need to pass a lot of messages back and forward.
-  # 
-  # I would set an assign that conditionally shows the modal like above
-  # 
-  # <.link patch={~p"/chat?action=create_server"}>Create Server</.link>
-  # 
-  # and then you can handle it in your handle_params
-  # 
-  # def handle_params(params, _, socket) do
-  #   {:noreply, assign(socket, :action, params["action"])}
-  # end
-  %>
-  <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
+<.modal :if={@action == "create_server"} id="create_server" show on_cancel={JS.patch(~p"/chat")}>
+  <.header>Create Server</.header>
+  <.live_component
+    id="create-server-component"
+    module={ServerCreateModalComponent}
+    current_user={@current_user}
+  />
 </.modal>
 
-<.modal :if={@action == "create_modal"} id="create_modal" show>
-  <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} />
+<.modal
+  :if={@selected_server_user && @action == "create_channel"}
+  id="create_channel"
+  show
+  on_cancel={JS.patch(~p"/chat")}
+>
+  <.header>Create Channel</.header>
+  <.live_component
+    id="create-channel-component"
+    module={ChannelCreateModalComponent}
+    current_user={@current_user}
+    server_user={@selected_server_user}
+  />
 </.modal>
-

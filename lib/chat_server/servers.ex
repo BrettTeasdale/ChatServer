@@ -25,7 +25,6 @@ defmodule ChatServer.Servers do
     Phoenix.PubSub.broadcast(ChatServer.PubSub, server_list_topic(user_id), message)
   end
 
-
   def channel_list_topic(user_id, server_id) do
     "channel_list:#{user_id}:#{server_id}"
   end
@@ -41,7 +40,6 @@ defmodule ChatServer.Servers do
   def channel_list_broadcast(user_id, server_id, message) do
     Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, server_id), message)
   end
-
 
   def chat_topic(channel_id) do
     "channel:#{channel_id}"
@@ -91,20 +89,7 @@ defmodule ChatServer.Servers do
 
   ## Examples
 
-      iex> list_latest_channel_messages($)
-      [%Server{}, ...]
-
-  """
-  def list_latest_channel_messages(%Channel{id: nil}) do
-    []
-  end
-
-@doc """
-  Returns the list of a channel's latest messages
-
-  ## Examples
-
-      iex> list_latest_channel_messages($)
+      iex> list_latest_channel_messages(channel)
       [%Server{}, ...]
 
   """
@@ -122,15 +107,10 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_server_user_channels(%ServerUser{id: id}) when is_nil(id) do
-    []
-  end
-
-  def list_server_user_channels(server_id) when is_binary(server_id) do
-    # No need to pass whole structs around, the id's are smaller
+  def list_server_user_channels(%ServerUser{} = server_user) do
     Repo.all(
       from c in Channel,
-      where: c.server_id == ^server_id
+        where: c.server_id == ^server_user.id
     )
   end
 
@@ -159,7 +139,6 @@ defmodule ChatServer.Servers do
     |> Repo.one!()
   end
 
-
   def get_channel!(channel_id) do
     Repo.get!(Channel, channel_id)
   end
@@ -180,41 +159,43 @@ defmodule ChatServer.Servers do
   """
   def get_server!(id), do: Repo.get!(Server, id)
 
-
   @doc """
   Creates a server that belongs to a user
   """
   def create_server(%User{} = user, %{} = attrs) do
     Repo.transaction(fn ->
-      {:ok, server} = %Server{}
-      |> Server.changeset(attrs)
-      |> Repo.insert()
+      {:ok, server} =
+        %Server{}
+        |> Server.changeset(attrs)
+        |> Repo.insert()
 
-      {:ok, server_user} = %ServerUser{}
-      |> ServerUser.changeset(%{
-        user_id: user.id,
-        server_id: server.id
-      })
-      |> Repo.insert()
+      {:ok, server_user} =
+        %ServerUser{}
+        |> ServerUser.changeset(%{
+          user_id: user.id,
+          server_id: server.id
+        })
+        |> Repo.insert()
 
-        {:ok, default_channel} = Channel.changeset(%Channel{}, %{
+      {:ok, default_channel} =
+        Channel.changeset(%Channel{}, %{
           name: "General",
           private: false,
           description: "A channel for general discussions.",
           server_id: server_user.server_id
-      })
-      |> Repo.insert()
+        })
+        |> Repo.insert()
 
-      {:ok, server_user} = ServerUser.changeset(server_user, %{
-        last_selected_channel_id: default_channel.id,
-      })
-      |> Repo.update()
+      {:ok, server_user} =
+        ServerUser.changeset(server_user, %{
+          last_selected_channel_id: default_channel.id
+        })
+        |> Repo.update()
 
-      server_user = server_user
-      |> Repo.preload(:user)
-      |> Repo.preload(:server)
-
-      IO.inspect(server_user)
+      server_user =
+        server_user
+        |> Repo.preload(:user)
+        |> Repo.preload(:server)
 
       server_user
     end)
@@ -226,9 +207,10 @@ defmodule ChatServer.Servers do
   def create_channel(%ServerUser{} = server_user, %{} = attrs) do
     attrs = Map.put(attrs, "server_id", server_user.server_id)
 
-    {:ok, channel} = %Channel{}
-    |> Channel.changeset(attrs)
-    |> Repo.insert()
+    {:ok, channel} =
+      %Channel{}
+      |> Channel.changeset(attrs)
+      |> Repo.insert()
 
     {:ok, Repo.preload(channel, :server)}
   end
@@ -237,16 +219,19 @@ defmodule ChatServer.Servers do
   Creates a message that belongs to a user
   """
   def create_message(%User{} = user, %Channel{} = channel, %{} = attrs) do
-    attrs = Map.put(attrs, "channel_id", channel.id)
-    |> Map.put("user_id", user.id)
+    attrs =
+      Map.put(attrs, "channel_id", channel.id)
+      |> Map.put("user_id", user.id)
 
-    {:ok, message} = %Message{}
-    |> Message.changeset(attrs)
-    |> Repo.insert()
+    {:ok, message} =
+      %Message{}
+      |> Message.changeset(attrs)
+      |> Repo.insert()
 
-    message = message
-    |> Repo.preload(:user)
-    |> Repo.preload(:channel)
+    message =
+      message
+      |> Repo.preload(:user)
+      |> Repo.preload(:channel)
 
     {:ok, message}
   end

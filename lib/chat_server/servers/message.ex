@@ -15,6 +15,7 @@ defmodule ChatServer.Servers.Message do
   def changeset(message, attrs) do
     message
     |> cast(attrs, [:message, :user_id, :channel_id])
-    #|> validate_required([:message])
+
+    # |> validate_required([:message])
   end
 end

@@ -3,11 +3,9 @@ defmodule ChatServerWeb.CustomComponents do
   use ChatServerWeb, :verified_routes
   use Gettext, backend: ChatServerWeb.Gettext
 
-  import ChatServerWeb.CoreComponents
-
   alias Phoenix.LiveView.JS
 
-@doc """
+  @doc """
   Renders a modal.
 
   ## Examples
@@ -31,12 +29,10 @@ defmodule ChatServerWeb.CustomComponents do
   attr :on_cancel, JS, default: %JS{}
   slot :header, required: false
   slot :inner_block, required: true
+
   def raw_modal(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class="relative z-50"
-    >
+    <div id={@id} class="relative z-50">
       <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
@@ -56,7 +52,10 @@ defmodule ChatServerWeb.CustomComponents do
               phx-target={@target}
               class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
             >
-              <div :if={@header} class="flex shrink-0 items-center pb-4 text-xl font-medium text-slate-800">
+              <div
+                :if={@header}
+                class="flex shrink-0 items-center pb-4 text-xl font-medium text-slate-800"
+              >
                 {render_slot(@header)}
               </div>
               {render_slot(@inner_block)}
