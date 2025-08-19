@@ -126,12 +126,13 @@ defmodule ChatServer.Servers do
     []
   end
 
-  def list_server_user_channels(%ServerUser{} = server_user) do
-    IO.inspect(server_user)
-    from(c in Channel, where: c.server_id == ^server_user.server_id)
-    |> Repo.all()
+  def list_server_user_channels(server_id) when is_binary(server_id) do
+    # No need to pass whole structs around, the id's are smaller
+    Repo.all(
+      from c in Channel,
+      where: c.server_id == ^server_id
+    )
   end
-
 
   @doc """
   Gets a single server user record.
