@@ -28,7 +28,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
     |> stream(:server_users, Servers.list_user_servers(socket.assigns.current_user))
-    |> stream(:channels, channels)
     |> assign(:channels, channels)
 
     {:ok, socket}
@@ -62,8 +61,8 @@ defmodule ChatServerWeb.ChatLive.Index do
             <.button phx-click="show_channel_create_modal">Create Channel</.button>
           </div>
           <div class="flex-1" id="channel_list" phx-update="stream">
-            <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
-              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
+            <div :for={channel <- @channels}>
+              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={channel.id == @selected_channel.id && "selected"}>
                 # {channel.name}
               </button>
             </div>
