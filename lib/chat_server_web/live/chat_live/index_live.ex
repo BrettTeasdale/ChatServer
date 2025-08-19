@@ -80,10 +80,20 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Handle broadcasts of PubSub events for the server list
 
   def handle_info({:server_created, %ServerUser{} = server_user}, socket) do
+    # If we move these to an assign then you can just re-assign the whole
+    # list. It an infrequent action and a quick query so the additional
+    # complexity you get by using streams isn't worth the optimization.
+    #
+    # server_users = Servers.list_user_servers(socket.assigns.current_user)
+    # {:noreply, assign(socket, :server_users, server_users)
+    #
+    # I think you'd need to update this in a couple places
     {:noreply, stream_insert(socket, :server_users, server_user, at: -1)}
   end
 
   def handle_info({:channel_created, %Channel{} = channel}, socket) do
+    # Same here;
+    #  channels = Servers.list_server_user_channels(%ServerUser{})
     {:noreply, stream_insert(socket, :channels, channel, at: -1)}
   end
 
@@ -116,7 +126,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:selected_server_user, server_user)
     |> assign(:selected_channel, server_user.last_selected_channel)
     |> stream_insert(:server_users, server_user)
-    |> stream(:channels, channels, reset: true)
     |> assign(:channels, channels)
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
