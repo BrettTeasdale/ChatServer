@@ -33,17 +33,23 @@ defmodule ChatServerWeb.ChatLive.Index do
     {:ok, socket}
   end
 
-  # Handle Server Create Modal Events
-
+  # This event can get removed if you show the modal via url param
   def handle_event("show_server_create_modal", _, socket) do
     send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
     {:noreply, socket}
   end
 
+  # This event can get removed if you show the modal via url param
   def handle_event("show_channel_create_modal", _, socket) do
     send_update(ChannelCreateModalComponent, id: "chat_channel_create_form", action: :show_channel_create_modal, selected_server_user: socket.assigns.selected_server_user)
     {:noreply, socket}
   end
+
+  # And they get replaced with a single handle_params like this
+  # def handle_params(params, _, socket) do
+  #   {:noreply, assign(socket, :action, params["action"])}
+  # end
+
 
   def handle_event("send_message", %{"message" => message_params, "channel-id" => channel_id}, socket) do
     %{current_user: user } = socket.assigns
