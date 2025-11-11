@@ -3,3 +3,14 @@
 @import "tailwindcss/utilities";
 
 /* This file is for your main application CSS */
+
+/* Hide the username if the previous message has the same data-user */
+/*.message:has(+ .message[data-user]:where([data-user=attr(data-user)])) .user {
+  display: none;
+}*/
+
+.message[data-user="1"] + .message[data-user="1"] .user,
+.message[data-user="2"] + .message[data-user="2"] .user,
+.message[data-user="3"] + .message[data-user="3"] .user {
+  display: none;
+}
