@@ -23,6 +23,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     channels = Servers.list_server_user_channels(%ServerUser{})
 
     socket = socket
+    |> assign(:modal_action, nil)
     |> assign(check_errors: false)
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
@@ -30,6 +31,8 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> stream(:server_users, Servers.list_user_servers(socket.assigns.current_user))
     |> stream(:channels, channels)
     |> assign(:channels, channels)
+    |> assign(:channel_last_message, %{})
+    |> assign(:channel_page, %{})
 
     {:ok, socket}
   end
@@ -82,9 +85,8 @@ defmodule ChatServerWeb.ChatLive.Index do
           <%= for channel <- @channels do %>
             <div class={["flex flex-col h-full channel_view", (if channel.id != Map.get(@selected_channel, :id), do: "hidden", else: "")]}>
               <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"}>
-                <% IO.inspect(@streams["messages_#{channel.id}"], label: "streams3") %>
-                <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id}>
-                  <div class="font-semibold">
+                <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message">
+                  <div class="font-semibold user">
                     {message.user.username}
                   </div>
                   <div class="w-full">
@@ -114,11 +116,15 @@ defmodule ChatServerWeb.ChatLive.Index do
         </div>
       </div>
     <div>
+      <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
+        <:header>Create New Server</:header>
+        <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
+      </.raw_modal>
 
-    <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
-
-    <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} />
-
+      <.raw_modal :if={@modal_action == "channel_create_modal"} id="channel-create-modal" hide_event="hide_modals">
+        <:header>Create New Channel</:header>
+        <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} selected_server_user={@selected_server_user} />
+      </.raw_modal>
     </div>
     """
   end
@@ -126,12 +132,25 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Handle Server Create Modal Events
 
   def handle_event("show_server_create_modal", _, socket) do
-    send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
+    #send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
+    socket = assign(socket, :modal_action, "server_create_modal")
     {:noreply, socket}
   end
 
   def handle_event("show_channel_create_modal", _, socket) do
-    send_update(ChannelCreateModalComponent, id: "chat_channel_create_form", action: :show_channel_create_modal, selected_server_user: socket.assigns.selected_server_user)
+    socket = assign(socket, :modal_action, "channel_create_modal")
+    {:noreply, socket}
+  end
+
+  def handle_event("hide_modals", _, socket) do
+    #send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
+    socket = assign(socket, :modal_action, nil)
+    {:noreply, socket}
+  end
+
+  def handle_info("hide_modals", socket) do
+    #send_update(ServerCreateModalComponent, id: "chat_server_create_form", action: :show_server_create_modal)
+    socket = assign(socket, :modal_action, nil)
     {:noreply, socket}
   end
 
@@ -172,7 +191,24 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def handle_info({:message_created, %Message{} = message}, socket) do
-    {:noreply, stream_insert(socket, "messages_#{message.channel.id}", message, at: -1, limit: -10)}
+
+    # Update the last message that will be the relative anchor of our pagination
+    current_last_message = Map.get(socket.assigns.channel_last_message, message.channel_id, %Message{})
+    current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
+
+    socket = if !Map.get(current_last_message, :id) || (Map.get(current_last_message, :id) && current_page == 0) do
+      IO.inspect("YES")
+      socket = socket
+      |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: -10)
+      |> assign(:channel_last_message, Map.put(socket.assigns.channel_last_message, message.channel.id, message))
+
+      socket
+    else
+      IO.inspect("no")
+      socket
+    end
+
+    {:noreply, socket}
   end
 
   def handle_info({:server_removed, %ServerUser{} = server_user}, socket) do
@@ -185,7 +221,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     %{selected_server_user: previous_selected_server_user } = socket.assigns
 
     # Unsubcribe from the previous selected server user's channels
-    if Map.get(previous_selected_server_user, :id) do
+    if Map.get(previous_selected_server_user, :id) && connected?(socket) do
       Servers.channel_list_unsubscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
 
       previous_channels = Servers.list_server_user_channels(previous_selected_server_user)
@@ -194,9 +230,10 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     server_user = Servers.get_server_user!(server_user_id)
     channels = Servers.list_server_user_channels(server_user)
-    IO.inspect(server_user.server.name)
 
     socket = socket
+    |> assign(:chat_action, "current_messages")
+    |> assign(:modal_action, nil)
     |> assign(:selected_server_user, server_user)
     |> assign(:selected_channel, server_user.last_selected_channel)
     |> stream_insert(:server_users, server_user)
@@ -213,11 +250,11 @@ defmodule ChatServerWeb.ChatLive.Index do
       socket
     end
 
-    Servers.channel_list_subscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
+    if connected?(socket) do
+      Servers.channel_list_subscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
 
-    for channel <- channels, do: Servers.chat_subscribe(channel.id)
-
-    IO.inspect(server_user)
+      for channel <- channels, do: Servers.chat_subscribe(channel.id)
+    end
 
     {:noreply, socket}
   end
@@ -228,8 +265,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     previous_selected_channel = socket.assigns.selected_channel
 
     channel = Servers.get_channel!(channel_id)
-
-    IO.inspect(channel)
 
     socket = socket
     |> assign(:selected_channel, channel)

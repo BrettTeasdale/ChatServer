@@ -109,8 +109,9 @@ defmodule ChatServer.Servers do
 
   """
   def list_latest_channel_messages(%Channel{} = channel) do
-    from(m in Message, where: m.channel_id == ^channel.id, preload: [:user], limit: ^100)
+    from(m in Message, where: m.channel_id == ^channel.id, preload: [:user], limit: ^10, order_by: [desc: m.inserted_at])
     |> Repo.all()
+    |> Enum.reverse()
   end
 
   @doc """
@@ -226,11 +227,14 @@ defmodule ChatServer.Servers do
   def create_channel(%ServerUser{} = server_user, %{} = attrs) do
     attrs = Map.put(attrs, "server_id", server_user.server_id)
 
-    {:ok, channel} = %Channel{}
+    channel = %Channel{}
     |> Channel.changeset(attrs)
     |> Repo.insert()
 
-    {:ok, Repo.preload(channel, :server)}
+    case channel do
+      {:error, changeset} -> {:error, changeset}
+      {:ok, channel} -> {:ok, Repo.preload(channel, :server)}
+    end
   end
 
   @doc """

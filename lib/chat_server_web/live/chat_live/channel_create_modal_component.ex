@@ -6,17 +6,9 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
   alias ChatServer.Servers;
   alias ChatServer.Servers.Channel;
 
-  def render(%{visible: false} = assigns) do
-    ~H"""
-      <div class="hidden"></div>
-    """
-  end
-
   def render(assigns) do
     ~H"""
       <div>
-        <.raw_modal id="channel-create-modal" hide_event="hide_channel_create_modal" target={@myself}>
-          <:header>Create New Channel</:header>
           <.simple_form
             for={@form}
             id="form"
@@ -43,13 +35,12 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
             <.input field={@form[:description]} type="textarea" label="Description" required />
 
             <div class="flex shrink-0 flex-wrap items-center pt-4 justify-end">
-              <button phx-click="hide_channel_create_modal" phx-target={@myself} class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
+              <button phx-click="hide_modals" class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
               <.button class="rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2">
                 Confirm
               </.button>
             </div>
           </.simple_form>
-        </.raw_modal>
       </div>
     """
   end
@@ -59,15 +50,6 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
 
     socket = socket
     |> assign(:form, to_form(changeset))
-    |> assign(:visible, false)
-
-    {:ok, socket}
-  end
-
-  def update(%{action: :show_channel_create_modal, selected_server_user: selected_server_user}, socket) do
-    socket = socket
-    |> assign(:visible, true)
-    |> assign(:selected_server_user, selected_server_user)
 
     {:ok, socket}
   end
@@ -75,12 +57,9 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
   def update(assigns, socket) do
     socket = socket
     |> assign(:current_user, assigns.current_user)
+    |> assign(:selected_server_user, assigns.selected_server_user)
 
     {:ok, socket}
-  end
-
-  def handle_event("hide_channel_create_modal", _, socket) do
-    {:noreply, assign(socket, :visible, false)}
   end
 
   def handle_event("validate", %{"channel" => channel_params}, socket) do
@@ -102,25 +81,26 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
     %{selected_server_user: selected_server_user } = socket.assigns
 
     case Servers.create_channel(selected_server_user, channel_params) do
-    {:ok, channel} ->
-      changeset = Servers.change_channel(%Channel{})
+      {:ok, channel} ->
+        changeset = Servers.change_channel(%Channel{})
 
-      socket = socket
-      |> assign(:form, to_form(changeset))
-      |> assign(:visible, false)
+        socket = socket
+        |> assign(:form, to_form(changeset))
 
-      IO.inspect(channel)
+        IO.inspect(channel)
 
-      Servers.channel_list_broadcast(socket.assigns.current_user.id, selected_server_user.server_id, {:channel_created, channel})
+        Servers.channel_list_broadcast(socket.assigns.current_user.id, selected_server_user.server_id, {:channel_created, channel})
 
-      {:noreply, socket}
+        send(self(), "hide_modals")
 
-     {:error, changeset} ->
-      socket = socket
-      |> assign(:form, to_form(changeset))
-      |> assign(:check_errors, true)
+        {:noreply, socket}
 
-      {:noreply, socket}
+      {:error, changeset} ->
+        socket = socket
+        |> assign(:form, to_form(changeset))
+        |> assign(:check_errors, true)
+
+        {:noreply, socket}
     end
   end
 

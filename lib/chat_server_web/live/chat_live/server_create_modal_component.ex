@@ -15,8 +15,6 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
   def render(assigns) do
     ~H"""
       <div>
-        <.raw_modal id="server-create-modal" hide_event="hide_server_create_modal" target={@myself}>
-          <:header>Create New Server</:header>
           <.simple_form
             for={@form}
             id="form"
@@ -38,13 +36,12 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
             <.input field={@form[:description]} type="textarea" label="Description" required />
 
             <div class="flex shrink-0 flex-wrap items-center pt-4 justify-end">
-              <button phx-click="hide_server_create_modal" phx-target={@myself} class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
+              <button phx-click="hide_modals" class="rounded-md border border-transparent py-2 px-4 text-center text-sm transition-all text-slate-600 hover:bg-slate-100 focus:bg-slate-100 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none">Cancel</button>
               <.button class="rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2">
                 Confirm
               </.button>
             </div>
           </.simple_form>
-        </.raw_modal>
       </div>
     """
   end
@@ -54,14 +51,7 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
 
     socket = socket
     |> assign(:form, to_form(changeset))
-    |> assign(:visible, false)
-
     {:ok, socket}
-  end
-
-  def update(%{action: :show_server_create_modal}, socket) do
-    IO.inspect("tango")
-    {:ok, assign(socket, :visible, true)}
   end
 
   def update(assigns, socket) do
@@ -69,10 +59,6 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
     |> assign(:current_user, assigns.current_user)
 
     {:ok, socket}
-  end
-
-  def handle_event("hide_server_create_modal", _, socket) do
-    {:noreply, assign(socket, :visible, false)}
   end
 
   def handle_event("validate", %{"server" => server_params}, socket) do
@@ -99,9 +85,10 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
 
       socket = socket
       |> assign(:form, to_form(changeset))
-      |> assign(:visible, false)
 
       Servers.server_list_broadcast(socket.assigns.current_user.id, {:server_created, server_user})
+
+      send(self(), "hide_modals")
 
       {:noreply, socket}
 
