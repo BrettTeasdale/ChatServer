@@ -81,7 +81,7 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_user_servers(user_id) do
+  def list_user_servers(user_id) when is_number(user_id) do
     from(su in ServerUser, where: su.user_id == ^user_id, preload: [:server])
     |> Repo.all()
   end
@@ -127,7 +127,7 @@ defmodule ChatServer.Servers do
     []
   end
 
-  def list_server_user_channels(server_user_id) do
+  def list_server_user_channels(server_user_id) when is_number(server_user_id) or is_binary(server_user_id) do
     from(c in Channel, where: c.server_id == ^server_user_id)
     |> Repo.all()
   end
@@ -147,12 +147,12 @@ defmodule ChatServer.Servers do
       ** (Ecto.NoResultsError)
 
   """
-  def get_server_user!(server_user_id) do
+  def get_server_user!(server_user_id) when is_number(server_user_id) or is_binary(server_user_id) do
     Repo.get!(ServerUser, server_user_id)
     |> Repo.preload([:last_selected_channel, :server])
   end
 
-  def get_server_default_channel!(server_id) do
+  def get_server_default_channel!(server_id) when is_number(server_id) do
     from(c in Channel, where: c.server_id == ^server_id and c.is_default == true)
     |> first()
     |> Repo.one!()

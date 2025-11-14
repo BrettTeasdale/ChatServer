@@ -212,7 +212,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     if Map.get(previous_selected_server_user, :id) && connected?(socket) do
       Servers.channel_list_unsubscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
 
-      previous_channels = Servers.list_server_user_channels(previous_selected_server_user)
+      previous_channels = Servers.list_server_user_channels(previous_selected_server_user.user_id)
       for previous_channel <- previous_channels, do: Servers.chat_unsubscribe(previous_channel.id)
     end
 
@@ -226,18 +226,11 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:selected_server_user, selected_server_user)
     |> assign(:selected_channel, selected_server_user.last_selected_channel)
     |> assign(:server_users, server_users)
-    |> stream(:channels, channels, reset: true)
     |> assign(:channels, channels)
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
       stream(acc_socket, "messages_#{channel.id}", Servers.list_latest_channel_messages(channel), reset: true, limit: -10)
     end)
-
-    socket = if Map.get(previous_selected_server_user, :id) do
-      stream_insert(socket, :server_users, previous_selected_server_user)
-    else
-      socket
-    end
 
     if connected?(socket) do
       Servers.channel_list_subscribe(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id)
@@ -250,15 +243,11 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   # Handle select server event
   def handle_event("select_channel", %{"channel-id" => channel_id}, socket) do
-    # Select the current selected channel to update in the channels stream
-    previous_selected_channel = socket.assigns.selected_channel
-
     channel = Servers.get_channel!(channel_id)
 
     socket = socket
     |> assign(:selected_channel, channel)
-    |> stream_insert(:channels, previous_selected_channel)
-    |> stream_insert(:channels, channel)
+    |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.id))
 
     {:noreply, socket}
   end
