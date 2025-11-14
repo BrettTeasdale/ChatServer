@@ -20,7 +20,7 @@ defmodule ChatServerWeb.ChatLive.Index do
       Servers.server_list_subscribe(socket.assigns.current_user.id)
     end
 
-    channels = Servers.list_server_user_channels(%ServerUser{})
+    channels = []
 
     socket = socket
     |> assign(:modal_action, nil)
@@ -28,8 +28,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
-    |> stream(:server_users, Servers.list_user_servers(socket.assigns.current_user))
-    |> stream(:channels, channels)
+    |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
     |> assign(:channels, channels)
     |> assign(:channel_last_message, %{})
     |> assign(:channel_page, %{})
@@ -40,10 +39,10 @@ defmodule ChatServerWeb.ChatLive.Index do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col w-screen h-screen p-0 m-0">
-      <div class="w-full text-center" :if={@selected_server_user.id}>
+      <div class="w-full text-center" :if={Map.get(@selected_server_user, :id)}>
         {@selected_server_user.server.name}
       </div>
-      <div class="w-full text-center" :if={!@selected_server_user.id}>
+      <div class="w-full text-center" :if={!Map.get(@selected_server_user, :id)}>
         Select a Server
       </div>
       <div class="flex flex-row h-full p-0 m-0">
@@ -51,9 +50,9 @@ defmodule ChatServerWeb.ChatLive.Index do
           <div>
             <.button phx-click="show_server_create_modal">Create Server</.button>
           </div>
-          <div phx-update="stream" id="server_list">
-            <div :for={{dom_id, server_user} <- @streams.server_users} id={dom_id}>
-              <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={if server_user.id == @selected_server_user.id do "selected" end}>
+          <div id="server_list">
+            <div :for={server_user <- @server_users}>
+              <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={@selected_server_user && server_user.id == @selected_server_user.id && "selected"}>
                 {server_user.server.name}
               </button>
             </div>
@@ -64,9 +63,9 @@ defmodule ChatServerWeb.ChatLive.Index do
           <div :if={Map.get(@selected_server_user, :id)}>
             <.button phx-click="show_channel_create_modal">Create Channel</.button>
           </div>
-          <div class="flex-1" id="channel_list" phx-update="stream">
-            <div :for={{dom_id, channel} <- @streams.channels} id={dom_id}>
-              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={if channel.id == @selected_channel.id do "selected" end}>
+          <div class="flex-1">
+            <div :for={channel <- @channels}>
+              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
                 # {channel.name}
               </button>
             </div>
@@ -115,17 +114,6 @@ defmodule ChatServerWeb.ChatLive.Index do
           </div>
         </div>
       </div>
-    <div>
-      <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
-        <:header>Create New Server</:header>
-        <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
-      </.raw_modal>
-
-      <.raw_modal :if={@modal_action == "channel_create_modal"} id="channel-create-modal" hide_event="hide_modals">
-        <:header>Create New Channel</:header>
-        <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} selected_server_user={@selected_server_user} />
-      </.raw_modal>
-    </div>
     """
   end
 
@@ -182,12 +170,12 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   # Handle broadcasts of PubSub events for the server list
 
-  def handle_info({:server_created, %ServerUser{} = server_user}, socket) do
-    {:noreply, stream_insert(socket, :server_users, server_user, at: -1)}
+  def handle_info({:server_created, %ServerUser{} = _server_user}, socket) do
+    {:noreply, assign(socket, :server_users, Servers.list_user_servers(socket.assigns.current_user.id))}
   end
 
   def handle_info({:channel_created, %Channel{} = channel}, socket) do
-    {:noreply, stream_insert(socket, :channels, channel, at: -1)}
+    {:noreply, assign(socket, :channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.id))}
   end
 
   def handle_info({:message_created, %Message{} = message}, socket) do
@@ -228,15 +216,16 @@ defmodule ChatServerWeb.ChatLive.Index do
       for previous_channel <- previous_channels, do: Servers.chat_unsubscribe(previous_channel.id)
     end
 
-    server_user = Servers.get_server_user!(server_user_id)
-    channels = Servers.list_server_user_channels(server_user)
+    selected_server_user = Servers.get_server_user!(server_user_id)
+    server_users = Servers.list_user_servers(socket.assigns.current_user.id)
+    channels = Servers.list_server_user_channels(server_user_id)
 
     socket = socket
     |> assign(:chat_action, "current_messages")
     |> assign(:modal_action, nil)
-    |> assign(:selected_server_user, server_user)
-    |> assign(:selected_channel, server_user.last_selected_channel)
-    |> stream_insert(:server_users, server_user)
+    |> assign(:selected_server_user, selected_server_user)
+    |> assign(:selected_channel, selected_server_user.last_selected_channel)
+    |> assign(:server_users, server_users)
     |> stream(:channels, channels, reset: true)
     |> assign(:channels, channels)
 
