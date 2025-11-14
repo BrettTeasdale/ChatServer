@@ -82,7 +82,7 @@ defmodule ChatServerWeb.ChatLive.Index do
             </div>
           </div>
           <%= for channel <- @channels do %>
-            <div class={["flex flex-col h-full channel_view", (if channel.id != Map.get(@selected_channel, :id), do: "hidden", else: "")]}>
+            <div class={["flex flex-col h-full channel_view", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
               <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"}>
                 <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message">
                   <div class="font-semibold user">
@@ -218,13 +218,13 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     selected_server_user = Servers.get_server_user!(server_user_id)
     server_users = Servers.list_user_servers(socket.assigns.current_user.id)
-    channels = Servers.list_server_user_channels(server_user_id)
+    selected_channel = Servers.get_channel!(selected_server_user.last_selected_channel_id)
+    channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
     socket = socket
-    |> assign(:chat_action, "current_messages")
     |> assign(:modal_action, nil)
     |> assign(:selected_server_user, selected_server_user)
-    |> assign(:selected_channel, selected_server_user.last_selected_channel)
+    |> assign(:selected_channel, selected_channel)
     |> assign(:server_users, server_users)
     |> assign(:channels, channels)
 
