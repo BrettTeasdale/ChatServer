@@ -80,7 +80,7 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
   def handle_event("save", %{"channel" => channel_params}, socket) do
     %{selected_server_user: selected_server_user } = socket.assigns
 
-    case Servers.create_channel(selected_server_user, channel_params) do
+    case Servers.create_channel(selected_server_user.server_id, channel_params) do
       {:ok, channel} ->
         changeset = Servers.change_channel(%Channel{})
 

@@ -79,7 +79,7 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
   def handle_event("save", %{"server" => server_params}, socket) do
     %{current_user: user } = socket.assigns
 
-    case Servers.create_server(user, server_params) do
+    case Servers.create_server(user.id, server_params) do
     {:ok, server_user} ->
       changeset = Servers.change_server(%Server{})
 

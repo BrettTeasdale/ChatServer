@@ -95,7 +95,7 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_latest_channel_messages(%Channel{id: nil}) do
+  def list_latest_channel_messages(nil) do
     []
   end
 
@@ -108,8 +108,8 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_latest_channel_messages(%Channel{} = channel) do
-    from(m in Message, where: m.channel_id == ^channel.id, preload: [:user], limit: ^10, order_by: [desc: m.inserted_at])
+  def list_latest_channel_messages(channel_id) when is_number(channel_id) or is_binary(channel_id) do
+    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^10, order_by: [desc: m.inserted_at])
     |> Repo.all()
     |> Enum.reverse()
   end
@@ -123,12 +123,12 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_server_user_channels(id) when is_nil(id) do
+  def list_server_user_channels(server_user_id) when is_nil(server_user_id) do
     []
   end
 
-  def list_server_user_channels(server_user_id) when is_number(server_user_id) or is_binary(server_user_id) do
-    from(c in Channel, where: c.server_id == ^server_user_id)
+  def list_server_user_channels(server_id) when is_number(server_id) or is_binary(server_id) do
+    from(c in Channel, where: c.server_id == ^server_id)
     |> Repo.all()
   end
 
@@ -152,7 +152,7 @@ defmodule ChatServer.Servers do
     |> Repo.preload([:last_selected_channel, :server])
   end
 
-  def get_server_default_channel!(server_id) when is_number(server_id) do
+  def get_server_default_channel!(server_id) when is_number(server_id) or is_binary(server_id) do
     from(c in Channel, where: c.server_id == ^server_id and c.is_default == true)
     |> first()
     |> Repo.one!()
@@ -183,7 +183,7 @@ defmodule ChatServer.Servers do
   @doc """
   Creates a server that belongs to a user
   """
-  def create_server(%User{} = user, %{} = attrs) do
+  def create_server(user_id, %{} = attrs) when is_number(user_id) or is_binary(user_id) do
     Repo.transaction(fn ->
       {:ok, server} = %Server{}
       |> Server.changeset(attrs)
@@ -191,7 +191,7 @@ defmodule ChatServer.Servers do
 
       {:ok, server_user} = %ServerUser{}
       |> ServerUser.changeset(%{
-        user_id: user.id,
+        user_id: user_id,
         server_id: server.id
       })
       |> Repo.insert()
@@ -222,8 +222,8 @@ defmodule ChatServer.Servers do
   @doc """
   Creates a channel that belongs to a server
   """
-  def create_channel(%ServerUser{} = server_user, %{} = attrs) do
-    attrs = Map.put(attrs, "server_id", server_user.server_id)
+  def create_channel(server_id, %{} = attrs) do
+    attrs = Map.put(attrs, "server_id", server_id)
 
     channel = %Channel{}
     |> Channel.changeset(attrs)
@@ -238,9 +238,9 @@ defmodule ChatServer.Servers do
   @doc """
   Creates a message that belongs to a user
   """
-  def create_message(%User{} = user, %Channel{} = channel, %{} = attrs) do
-    attrs = Map.put(attrs, "channel_id", channel.id)
-    |> Map.put("user_id", user.id)
+  def create_message(user_id, channel_id, %{} = attrs) when (is_number(user_id) or is_binary(user_id)) and (is_number(channel_id) or is_binary(channel_id))do
+    attrs = Map.put(attrs, "channel_id", channel_id)
+    |> Map.put("user_id", user_id)
 
     {:ok, message} = %Message{}
     |> Message.changeset(attrs)
