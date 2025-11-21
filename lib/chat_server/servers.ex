@@ -109,9 +109,37 @@ defmodule ChatServer.Servers do
 
   """
   def list_latest_channel_messages(channel_id) when is_number(channel_id) or is_binary(channel_id) do
-    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^10, order_by: [desc: m.inserted_at])
+    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^10, order_by: [desc: m.id])
     |> Repo.all()
     |> Enum.reverse()
+  end
+
+  def list_previous_channel_messages(channel_id, last_message_id, message_amount) do
+    base = from(
+      m in Message,
+      select: %{id: m.id, row_number: over(row_number(), :message_partition)},
+      windows: [message_partition: [order_by: [desc: m.id]]],
+      where: m.channel_id == ^channel_id and m.id < ^last_message_id,
+      limit: (^message_amount * 2),
+      order_by: [desc: m.id]
+    )
+
+    query = from(
+      m in Message,
+      join: b in subquery(base),
+      on: m.id == b.id and b.row_number > ^message_amount,
+      where: m.channel_id == ^channel_id and m.id < ^last_message_id,
+      preload: [:user],
+      order_by: [desc: b.row_number]
+    )
+
+    query |> Repo.all()
+  end
+
+
+  def get_channel_top_message!(channel_id) do
+    from(m in Message, where: m.channel_id == ^channel_id, order_by: [asc: m.inserted_at], limit: 1)
+    |> Repo.one()
   end
 
   @doc """
