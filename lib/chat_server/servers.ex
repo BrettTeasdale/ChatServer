@@ -133,7 +133,9 @@ defmodule ChatServer.Servers do
       order_by: [desc: b.row_number]
     )
 
-    query |> Repo.all()
+    query
+    |> Repo.all()
+    |> Enum.reverse()
   end
 
 
