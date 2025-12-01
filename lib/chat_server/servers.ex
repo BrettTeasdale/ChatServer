@@ -108,8 +108,8 @@ defmodule ChatServer.Servers do
       [%Server{}, ...]
 
   """
-  def list_latest_channel_messages(channel_id) when is_number(channel_id) or is_binary(channel_id) do
-    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^10, order_by: [desc: m.id])
+  def list_latest_channel_messages(channel_id, limit) when is_number(channel_id) or is_binary(channel_id) do
+    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^limit, order_by: [desc: m.id])
     |> Repo.all()
     |> Enum.reverse()
   end
@@ -136,6 +136,30 @@ defmodule ChatServer.Servers do
     query
     |> Repo.all()
     |> Enum.reverse()
+  end
+
+
+  def list_next_channel_messages(channel_id, last_message_id, message_amount) do
+    base = from(
+      m in Message,
+      select: %{id: m.id, row_number: over(row_number(), :message_partition)},
+      windows: [message_partition: [order_by: [asc: m.id]]],
+      where: m.channel_id == ^channel_id and m.id > ^last_message_id,
+      limit: (^message_amount * 2),
+      order_by: [desc: m.id]
+    )
+
+    query = from(
+      m in Message,
+      join: b in subquery(base),
+      on: m.id == b.id and b.row_number > ^message_amount,
+      where: m.channel_id == ^channel_id and m.id > ^last_message_id,
+      preload: [:user],
+      order_by: [asc: b.row_number]
+    )
+
+    query
+    |> Repo.all()
   end
 
 
@@ -242,8 +266,6 @@ defmodule ChatServer.Servers do
       server_user = server_user
       |> Repo.preload(:user)
       |> Repo.preload(:server)
-
-      IO.inspect(server_user)
 
       server_user
     end)

@@ -33,6 +33,9 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channel_last_message, %{})
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, NaiveDateTime.utc_now)
+    |> assign(:prev_page_in_flight, false)
+    |> assign(:next_page_in_flight, false)
+    |> assign(:message_page_size, 100)
 
     {:ok, socket}
   end
@@ -83,8 +86,13 @@ defmodule ChatServerWeb.ChatLive.Index do
             </div>
           </div>
           <%= for channel <- @channels do %>
-            <div class={["flex flex-col h-full channel_view", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
-              <div class="flex flex-1 flex-col w-full" phx-update="stream" id={"messages_#{channel.id}"} phx-viewport-top={JS.push("prev-page", page_loading: true, value: %{channel_id: channel.id})}>
+            <div class={["flex flex-col h-full channel_view overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
+              <div
+              class="flex flex-1 flex-col w-full overflow-y-auto"
+              phx-update="stream"
+              id={"messages_#{channel.id}"}
+              phx-viewport-top={JS.push("prev-page", page_loading: true, value: %{channel_id: channel.id})}
+              phx-viewport-bottom={JS.push("next-page", page_loading: true, value: %{channel_id: channel.id})}>
                 <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message">
                   <div class="font-semibold user">
                     {message.user.username}
@@ -187,7 +195,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def handle_info({:previous_page, channel_id}, socket) do
     socket = if(socket.assigns.prev_page_in_flight) do
-      previous_page({:previous_page, channel_id}, socket)
+      previous_page(socket, {:previous_page, channel_id})
     else
       socket
     end
@@ -201,30 +209,96 @@ defmodule ChatServerWeb.ChatLive.Index do
     page_data = Map.get(socket.assigns.channel_page_data, channel_id)
 
     last_queue_message =  Map.get(page_data, :last_queue_message, %Message{})
-    previous_page_messages = Servers.list_previous_channel_messages(channel_id, last_queue_message.id, 10)
+    previous_page_messages = Servers.list_previous_channel_messages(channel_id, last_queue_message.id, socket.assigns.message_page_size)
 
     has_reached_top = Map.get(socket.assigns.channel_page_data, channel_id, %{})[:has_reached_top] || Enum.any?(previous_page_messages, fn msg -> msg.id == page_data.top_message.id end)
     has_reached_bottom = Map.get(socket.assigns.channel_page_data, channel_id, %{})[:has_reached_bottom] || Enum.any?(previous_page_messages, fn msg -> msg.id == Map.get(Map.get(page_data, channel_id), :last_queue_message) end)
 
     new_page_data = %{
-      last_queue_message: Enum.at(previous_page_messages, -1) || last_queue_message,
+      last_queue_message: Enum.at(previous_page_messages, 0) || last_queue_message,
       top_message: page_data.top_message,
       bottom_message: page_data.bottom_message,
       has_reached_top: has_reached_top,
       has_reached_bottom: has_reached_bottom,
     }
 
-    socket = socket
-    |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, channel_id, new_page_data))
-    |> assign(:last_viewport_event, NaiveDateTime.utc_now())
-    |> stream("messages_#{channel_id}", previous_page_messages, reset: true, at: 0)
-    #|> stream_insert("messages_#{channel_id}", previous_page_messages, limit: 10, at: 0)
+    if(previous_page_messages != []) do
+      socket
+      |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, channel_id, new_page_data))
+      |> assign(:last_viewport_event, NaiveDateTime.utc_now())
+      |> stream("messages_#{channel_id}", previous_page_messages, reset: true, at: 0)
+      #|> stream_insert("messages_#{channel_id}", previous_page_messages, limit: socket.assigns.message_page_size, at: 0)
 
-    # socket = Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
-    #   stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, limit: -10)
-    # end)
-    socket
+      # socket = Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
+      #   stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, limit: socket.assigns.message_page_size * -1)
+      # end)
+    else
+        socket
+    end
+
   end
+
+
+  def handle_event("next-page", %{"channel_id" => channel_id}, socket) do
+    case NaiveDateTime.compare(NaiveDateTime.add(NaiveDateTime.utc_now(), -1), socket.assigns.last_viewport_event) do
+     :gt ->
+        socket = socket
+        |> next_page({:next_page, channel_id})
+        |> assign(:next_page_in_flight, false)
+        {:noreply, socket}
+      _ ->
+        IO.inspect("THROTTLED")
+        socket = if connected?(socket) and !socket.assigns.next_page_in_flight do
+          Process.send_after(self(), {:next_page, channel_id}, 1000)
+          socket |> assign(:next_page_in_flight, true)
+        else
+          socket
+        end
+
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info({:next_page, channel_id}, socket) do
+    socket = if(socket.assigns.next_page_in_flight) do
+      next_page(socket, {:next_page, channel_id})
+    else
+      socket
+    end
+
+    socket = assign(socket, :next_page_in_flight, false)
+
+    {:noreply, socket}
+  end
+
+  def next_page(socket, {:next_page, channel_id}) do
+    page_data = Map.get(socket.assigns.channel_page_data, channel_id)
+
+    last_queue_message =  Map.get(page_data, :last_queue_message, %Message{})
+    next_page_messages = Servers.list_next_channel_messages(channel_id, last_queue_message.id, socket.assigns.message_page_size)
+
+    has_reached_top = Map.get(socket.assigns.channel_page_data, channel_id, %{})[:has_reached_top] || Enum.any?(next_page_messages, fn msg -> msg.id == page_data.top_message.id end)
+    has_reached_bottom = Map.get(socket.assigns.channel_page_data, channel_id, %{})[:has_reached_bottom] || Enum.any?(next_page_messages, fn msg -> msg.id == Map.get(Map.get(page_data, channel_id), :last_queue_message) end)
+
+    new_page_data = %{
+      last_queue_message: Enum.at(next_page_messages, 0) || last_queue_message,
+      top_message: page_data.top_message,
+      bottom_message: page_data.bottom_message,
+      has_reached_top: has_reached_top,
+      has_reached_bottom: has_reached_bottom,
+    }
+
+    if(next_page_messages != []) do
+      socket = socket
+      |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, channel_id, new_page_data))
+      |> assign(:last_viewport_event, NaiveDateTime.utc_now())
+      |> stream("messages_#{channel_id}", next_page_messages, reset: true, at: 0)
+      socket
+    else
+      socket
+    end
+  end
+
 
   # Handle broadcasts of PubSub events for the server list
 
@@ -248,13 +322,13 @@ defmodule ChatServerWeb.ChatLive.Index do
     bottom_message = Map.get(Map.get(socket.assigns.channel_page_data, message.channel_id, %Message{}), :bottom_message, %Message{})
     ## current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
 
-    socket = if !Map.get(bottom_message, :id) || (Map.get(bottom_message, :id) && bottom_message.id == message.id) do
+    socket = if !Map.get(bottom_message, :id) || (Map.get(bottom_message, :id, 0) == Map.get(Map.get(Map.get(socket.assigns.channel_page_data, message.channel_id), :last_queue_message), :id)) do
       IO.inspect("YES")
       socket = socket
-      |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: -10)
+      |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: socket.assigns.message_page_size * -1)
       #|> assign(:channel_last_message, Map.put(socket.assigns.channel_last_message, message.channel.id, message))
       |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, message.channel.id, %{socket.assigns.channel_page_data[message.channel.id] |
-        last_message: message,
+        last_queue_message: message,
         bottom_message: message,
         has_reached_top: false,
         has_reached_bottom: true,
@@ -292,7 +366,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
     latest_channel_messages = for channel <- channels, into: %{} do
-      {channel.id, Servers.list_latest_channel_messages(channel.id)}
+      {channel.id, Servers.list_latest_channel_messages(channel.id, socket.assigns.message_page_size)}
     end
 
     channel_page_data = for channel <- channels, into: %{} do
@@ -316,7 +390,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channel_page_data, channel_page_data)
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
-      stream(acc_socket, "messages_#{channel.id}", Map.get(latest_channel_messages, channel.id), reset: true, limit: -10)
+      stream(acc_socket, "messages_#{channel.id}", Map.get(latest_channel_messages, channel.id), reset: true, limit: socket.assigns.message_page_size * -1)
     end)
 
     if connected?(socket) do
