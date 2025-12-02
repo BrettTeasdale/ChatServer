@@ -2,6 +2,47 @@
 // to get started and then uncomment the line below.
 // import "./user_socket.js"
 
+
+let Hooks = {}
+
+last_scroll_top = {};
+
+Hooks.messageScroll = {
+  mounted() {
+
+    console.log("TEST");
+    let el = this.el
+    let channel_id = el.dataset.channel_id;
+    let threshold = 5;
+
+    el.addEventListener("scroll", () => {
+      if ((el.scrollTop <= threshold) && (last_scroll_top[channel_id] > el.scrollTop)) { // scrolled to top
+        console.log("REACHED TOP");
+        let first = el.querySelector(".message");
+        let last_message_id = first ? first.dataset.message_id : null;
+        console.log(last_message_id);
+        // if (first) JS.push("reached_top", { message_id: first.dataset.message_id })
+        if (first) this.pushEvent("prev-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
+          console.log(reply)
+        );
+      }else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (last_scroll_top[channel_id] < el.scrollTop)) { // scrolled to bottom
+        console.log("REACHED BOTTOM");
+        let items = el.querySelectorAll(".message")
+        let last = items[items.length - 1]
+        let last_message_id = last ? last.dataset.message_id : null;
+        console.log(last_message_id);
+        if (last) this.pushEvent("next-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
+          console.log(reply)
+        );
+      }
+
+      last_scroll_top[channel_id] = el.scrollTop;
+    })
+  }
+}
+
+export default Hooks
+
 // You can include dependencies in two ways.
 //
 // The simplest option is to put them in assets/vendor and
@@ -25,7 +66,8 @@ import topbar from "../vendor/topbar"
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken}
+  params: {_csrf_token: csrfToken},
+  hooks: Hooks
 })
 
 // Show progress bar on live navigation and form submits
@@ -41,4 +83,3 @@ liveSocket.connect()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
-

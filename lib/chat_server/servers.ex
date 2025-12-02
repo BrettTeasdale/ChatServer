@@ -115,51 +115,27 @@ defmodule ChatServer.Servers do
   end
 
   def list_previous_channel_messages(channel_id, last_message_id, message_amount) do
-    base = from(
-      m in Message,
-      select: %{id: m.id, row_number: over(row_number(), :message_partition)},
-      windows: [message_partition: [order_by: [desc: m.id]]],
-      where: m.channel_id == ^channel_id and m.id < ^last_message_id,
-      limit: (^message_amount * 2),
-      order_by: [desc: m.id]
-    )
-
     query = from(
       m in Message,
-      join: b in subquery(base),
-      on: m.id == b.id and b.row_number > ^message_amount,
       where: m.channel_id == ^channel_id and m.id < ^last_message_id,
       preload: [:user],
-      order_by: [desc: b.row_number]
+      order_by: [desc: m.id],
+      limit: ^message_amount
     )
 
-    query
-    |> Repo.all()
-    |> Enum.reverse()
+    Repo.all(query)
   end
 
-
   def list_next_channel_messages(channel_id, last_message_id, message_amount) do
-    base = from(
-      m in Message,
-      select: %{id: m.id, row_number: over(row_number(), :message_partition)},
-      windows: [message_partition: [order_by: [asc: m.id]]],
-      where: m.channel_id == ^channel_id and m.id > ^last_message_id,
-      limit: (^message_amount * 2),
-      order_by: [desc: m.id]
-    )
-
     query = from(
       m in Message,
-      join: b in subquery(base),
-      on: m.id == b.id and b.row_number > ^message_amount,
       where: m.channel_id == ^channel_id and m.id > ^last_message_id,
       preload: [:user],
-      order_by: [asc: b.row_number]
+      order_by: [asc: m.id],
+      limit: ^message_amount
     )
 
-    query
-    |> Repo.all()
+    Repo.all(query)
   end
 
 
