@@ -201,10 +201,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     else
         socket
     end
-
-    # socket = Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
-    #   stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, 2 *  * -1)
-    # end
   end
 
 
@@ -234,7 +230,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     if(next_page_messages != []) do
       socket = Enum.reduce(next_page_messages, socket, fn message, acc_socket ->
         IO.inspect(message, label: "MESSAGE")
-        stream_insert(acc_socket, "messages_#{channel_id}", message, limit: -2 * socket.assigns.message_page_size)
+        stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
       end)
       |> assign(:last_viewport_event, NaiveDateTime.utc_now())
 
@@ -269,7 +265,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     socket = if !Map.get(bottom_message, :id) || (Map.get(bottom_message, :id, 0) == Map.get(Map.get(Map.get(socket.assigns.channel_page_data, message.channel_id), :bottom_message), :id)) do
       IO.inspect("YES")
       socket
-      |> stream_insert("messages_#{message.channel.id}", message, limit: -2 * socket.assigns.message_page_size)
+      |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
       #|> assign(:channel_last_message, Map.put(socket.assigns.channel_last_message, message.channel.id, message))
       |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, message.channel.id, %{socket.assigns.channel_page_data[message.channel.id] |
         bottom_message: message,

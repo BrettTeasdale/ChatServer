@@ -5,7 +5,7 @@
 
 let Hooks = {}
 
-last_scroll_top = {};
+let last_scroll_top = {};
 
 Hooks.messageScroll = {
   mounted() {
@@ -16,21 +16,24 @@ Hooks.messageScroll = {
     let threshold = 5;
 
     el.addEventListener("scroll", () => {
-      if ((el.scrollTop <= threshold) && (last_scroll_top[channel_id] > el.scrollTop)) { // scrolled to top
+      const now = Date.now();
+      const lastCheck = last_scroll_top[`${channel_id}_time`] || 0;
+      
+      if (now - lastCheck < 500) return; // Throttle to 500ms
+      last_scroll_top[`${channel_id}_time`] = now;
+
+      if ((el.scrollTop <= threshold) && (last_scroll_top[channel_id] > el.scrollTop)) {
         console.log("REACHED TOP");
         let first = el.querySelector(".message");
         let last_message_id = first ? first.dataset.message_id : null;
-        console.log(last_message_id);
-        // if (first) JS.push("reached_top", { message_id: first.dataset.message_id })
         if (first) this.pushEvent("prev-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
           console.log(reply)
         );
-      }else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (last_scroll_top[channel_id] < el.scrollTop)) { // scrolled to bottom
+      } else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (last_scroll_top[channel_id] < el.scrollTop)) {
         console.log("REACHED BOTTOM");
-        let items = el.querySelectorAll(".message")
-        let last = items[items.length - 1]
+        let items = el.querySelectorAll(".message");
+        let last = items[items.length - 1];
         let last_message_id = last ? last.dataset.message_id : null;
-        console.log(last_message_id);
         if (last) this.pushEvent("next-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
           console.log(reply)
         );
