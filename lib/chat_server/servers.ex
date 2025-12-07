@@ -139,6 +139,53 @@ defmodule ChatServer.Servers do
   end
 
 
+  def search_messages_in_server(server_id, query, amount, last_message_id \\ 0) do
+    query = case last_message_id do
+      0 ->
+        from(
+          m in Message,
+          where: ilike(m.message, ^"%#{query}%"),
+          preload: [:user, :channel],
+          order_by: [desc: m.id],
+          limit: ^amount
+        )
+      _ ->
+        from(
+          m in Message,
+          where: ilike(m.message, ^"%#{query}%") and m.id < ^last_message_id,
+          preload: [:user, :channel],
+          order_by: [desc: m.id],
+          limit: ^amount
+        )
+    end
+
+    Repo.all(query)
+  end
+
+
+  def list_channel_messages_from_message_id(message_id, message_amount) do
+    channel_id = Repo.get!(Message, message_id).channel_id
+
+    below = from(
+      m in Message,
+      where: m.channel_id == ^channel_id and m.id <= ^message_id,
+      order_by: [desc: m.id],
+      limit: ^message_amount
+    )
+
+    above = from(
+      m in Message,
+      where: m.channel_id == ^channel_id and m.id > ^message_id,
+      preload: [:user, :channel],
+      order_by: [asc: m.id],
+      limit: ^message_amount
+    )
+
+    Repo.all(union(subquery(below), ^above))
+  end
+
+
+
   def get_channel_top_message!(channel_id) do
     from(m in Message, where: m.channel_id == ^channel_id, order_by: [asc: m.inserted_at], limit: 1)
     |> Repo.one()

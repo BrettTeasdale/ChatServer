@@ -5,7 +5,9 @@
 
 let Hooks = {}
 
-let last_scroll_top = {};
+let last_scroll_top_messages = {};
+let last_scroll_top_search_history;
+let last_check_search_history;
 
 Hooks.messageScroll = {
   mounted() {
@@ -17,29 +19,78 @@ Hooks.messageScroll = {
 
     el.addEventListener("scroll", () => {
       const now = Date.now();
-      const lastCheck = last_scroll_top[`${channel_id}_time`] || 0;
-      
-      if (now - lastCheck < 500) return; // Throttle to 500ms
-      last_scroll_top[`${channel_id}_time`] = now;
 
-      if ((el.scrollTop <= threshold) && (last_scroll_top[channel_id] > el.scrollTop)) {
+      const lastCheck = last_scroll_top_messages[`${channel_id}_time`];
+      console.log(now, "now", lastCheck, "lastcheck", now - lastCheck, "diff");
+
+      let last_scroll_top = last_scroll_top_messages[channel_id] || el.scrollTop;
+      last_scroll_top_messages[channel_id] = el.scrollTop;
+      
+      console.log(el.clientHeight, "test", el.scrollTop, "scroll", el.scrollHeight - el.scrollTop - el.clientHeight, "mathed", el.scrollTop >= last_scroll_top, "direction");
+
+      if (now - lastCheck < 250) return; // Throttle to 250ms
+
+      if ((el.scrollTop <= threshold) && (el.scrollTop <= last_scroll_top)) {
+        last_scroll_top_messages[`${channel_id}_time`] = now;
         console.log("REACHED TOP");
         let first = el.querySelector(".message");
         let last_message_id = first ? first.dataset.message_id : null;
-        if (first) this.pushEvent("prev-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
+        if (first) this.pushEvent("prev-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply) =>
           console.log(reply)
         );
-      } else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (last_scroll_top[channel_id] < el.scrollTop)) {
+      } else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (el.scrollTop >= last_scroll_top)) {
+        last_scroll_top_messages[`${channel_id}_time`] = now;
         console.log("REACHED BOTTOM");
         let items = el.querySelectorAll(".message");
         let last = items[items.length - 1];
         let last_message_id = last ? last.dataset.message_id : null;
-        if (last) this.pushEvent("next-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply, ref) =>
+        if (last) this.pushEvent("next-page", {channel_id: channel_id, last_message_id: last_message_id}, (reply) =>
           console.log(reply)
         );
       }
 
-      last_scroll_top[channel_id] = el.scrollTop;
+    })
+  }
+}
+
+Hooks.searchHistoryScroll = {
+  mounted() {
+    let el = this.el
+    let threshold = 5;
+
+    el.addEventListener("scroll", () => {
+      const now = Date.now();
+      
+      const lastCheck = last_check_search_history;
+      console.log(now, "now", lastCheck, "lastcheck", now - lastCheck, "diff");
+
+      let last_scroll_top = last_scroll_top_search_history || el.scrollTop;
+      last_scroll_top_search_history = el.scrollTop;
+
+      console.log(el.clientHeight, "test", el.scrollTop, "scroll", el.scrollHeight - el.scrollTop - el.clientHeight, "mathed", el.scrollTop >= last_scroll_top, "direction");
+      
+      if (now - lastCheck < 250) return; // Throttle to 250ms
+      console.log("CHECKING SEARCH SCROLL");
+
+      if ((el.scrollTop <= threshold) && (el.scrollTop <= last_scroll_top)) {
+        last_check_search_history = now;
+        console.log("REACHED TOP SEARCH");
+        let first = el.querySelector(".message");
+        let last_message_id = first ? first.dataset.message_id : null;
+        if (first) this.pushEvent("prev-page", {last_message_id: last_message_id}, (reply, ref) =>
+          console.log(reply)
+        );
+      } else if ((el.scrollHeight - el.scrollTop - el.clientHeight <= threshold) && (el.scrollTop >= last_scroll_top)) {
+
+        last_check_search_history = now;
+        console.log("REACHED BOTTOM SEARCH");
+        let items = el.querySelectorAll(".message");
+        let last = items[items.length - 1];
+        let last_message_id = last ? last.dataset.message_id : null;
+        if (last) this.pushEvent("next-page", {last_message_id: last_message_id}, (reply, ref) =>
+          console.log(reply)
+        );
+      }
     })
   }
 }

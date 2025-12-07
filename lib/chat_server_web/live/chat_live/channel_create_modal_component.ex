@@ -11,7 +11,7 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
       <div>
           <.simple_form
             for={@form}
-            id="form"
+            id="search_form"
             phx-submit="save"
             phx-change="validate"
             phx-target={@myself}

@@ -33,8 +33,10 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channel_last_message, %{})
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, NaiveDateTime.utc_now)
-    |> assign(:message_page_size, 20)
-    |> assign(:search_action, :inactive)
+    |> assign(:message_page_size, 50)
+    |> assign(:sidebar_action, :users)
+    |> assign(:search_form, to_form(%{}))
+    |> stream(:search_results, [])
 
     {:ok, socket}
   end
@@ -42,11 +44,26 @@ defmodule ChatServerWeb.ChatLive.Index do
   def render(assigns) do
     ~H"""
     <div class="fixed top-0 right-0 left-0">
+        <div class="float-right mt-0 mb-0 ml-0 mr-8">
+          <.simple_form
+            for={@search_form}
+            id="form"
+            phx-submit="search"
+            no_margin={true}
+          >
+          <input type="text" name="query" value="" placeholder="Search..." />
+          </.simple_form>
+        </div>
       <div class="w-full text-center" :if={Map.get(@selected_server_user, :id)}>
         {@selected_server_user.server.name}
       </div>
       <div class="w-full text-center" :if={!Map.get(@selected_server_user, :id)}>
         Select a Server
+      </div>
+      <div class="w-full">
+        <div class="text-center">
+          <h3># {@selected_channel.name}</h3>
+        </div>
       </div>
     </div>
     <div class="flex flex-col w-screen h-screen m-0 pl-0 pr-0 pb-0 pt-10">
@@ -78,14 +95,6 @@ defmodule ChatServerWeb.ChatLive.Index do
         </div>
 
         <div class="flex flex-col w-full h-full">
-          <div class="flex flex-row">
-            <div class="flex-1">
-              <h3># {@selected_channel.name}</h3>
-            </div>
-            <div class="mr-8">
-              <input type="text" name="query" value="" placeholder="Search..." />
-            </div>
-          </div>
           <div class="flex h-full w-full">
           <%= for channel <- @channels do %>
             <div class={["flex flex-1 flex-col w-full h-full channel_view overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
@@ -117,10 +126,24 @@ defmodule ChatServerWeb.ChatLive.Index do
               </div>
             </div>
           <% end %>
-              <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@search_action == :inactive || " hidden")]}>
+              <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
                 Search
+                <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
+                  <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id}>
+                    <div class="font-semibold channel_name">
+                      {message.channel.name}
+                    </div>
+                    <div class="w-full">
+                      <span class="user">{message.user.username}</span>
+                      <br/>{message.message}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@sidebar_action == :users || " hidden")]}>
+                Users
                 <div class="flex-1">
-                search results
+                Users
                   <!--
                   <div :for={channel <- @channels}>
                     <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
@@ -361,6 +384,14 @@ defmodule ChatServerWeb.ChatLive.Index do
     socket = socket
     |> assign(:selected_channel, channel)
     |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.server_id))
+
+    {:noreply, socket}
+  end
+
+  def handle_event("search", %{"query" => query}, socket) do
+    socket = socket
+    |> assign(:sidebar_action, :search)
+    |> stream(:search_results, Servers.search_messages_in_server(socket.assigns.selected_server_user.server_id, query, 40), reset: true)
 
     {:noreply, socket}
   end
