@@ -34,19 +34,22 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, NaiveDateTime.utc_now)
     |> assign(:message_page_size, 20)
+    |> assign(:search_action, :inactive)
 
     {:ok, socket}
   end
 
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col w-screen h-screen p-0 m-0">
+    <div class="fixed top-0 right-0 left-0">
       <div class="w-full text-center" :if={Map.get(@selected_server_user, :id)}>
         {@selected_server_user.server.name}
       </div>
       <div class="w-full text-center" :if={!Map.get(@selected_server_user, :id)}>
         Select a Server
       </div>
+    </div>
+    <div class="flex flex-col w-screen h-screen m-0 pl-0 pr-0 pb-0 pt-10">
       <div class="flex flex-row h-full p-0 m-0">
         <div class="h-full w-40 overflow-y-scroll">
           <div>
@@ -83,8 +86,9 @@ defmodule ChatServerWeb.ChatLive.Index do
               <input type="text" name="query" value="" placeholder="Search..." />
             </div>
           </div>
+          <div class="flex h-full w-full">
           <%= for channel <- @channels do %>
-            <div class={["flex flex-col h-full channel_view overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
+            <div class={["flex flex-1 flex-col w-full h-full channel_view overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
               <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"messages_#{channel.id}"} phx-hook={"messageScroll"} data-channel_id={channel.id}>
                 <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message" data-message_id={message.id}>
                   <div class="font-semibold user">
@@ -113,8 +117,24 @@ defmodule ChatServerWeb.ChatLive.Index do
               </div>
             </div>
           <% end %>
+              <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@search_action == :inactive || " hidden")]}>
+                Search
+                <div class="flex-1">
+                search results
+                  <!--
+                  <div :for={channel <- @channels}>
+                    <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
+                      # {channel.name}
+                    </button>
+                  </div>
+                  -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+
       </div>
       <div>
         <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
@@ -202,7 +222,6 @@ defmodule ChatServerWeb.ChatLive.Index do
         socket
     end
   end
-
 
   def handle_event("next-page", %{"channel_id" => channel_id, "last_message_id" => last_message_id}, socket) do
     case NaiveDateTime.compare(NaiveDateTime.add(NaiveDateTime.utc_now(), -1), socket.assigns.last_viewport_event) do
