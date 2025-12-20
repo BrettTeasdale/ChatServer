@@ -6,12 +6,6 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
   alias ChatServer.Servers;
   alias ChatServer.Servers.Server;
 
-  def render(%{visible: false} = assigns) do
-    ~H"""
-      <div class="hidden"></div>
-    """
-  end
-
   def render(assigns) do
     ~H"""
       <div>
@@ -80,13 +74,13 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
     %{current_user: user } = socket.assigns
 
     case Servers.create_server(user.id, server_params) do
-    {:ok, server_user} ->
+    {:ok, _server_user} ->
       changeset = Servers.change_server(%Server{})
 
       socket = socket
       |> assign(:form, to_form(changeset))
 
-      Servers.server_list_broadcast(socket.assigns.current_user.id, {:server_created, server_user})
+      Servers.server_list_broadcast(socket.assigns.current_user.id, {:servers_updated})
 
       send(self(), "hide_modals")
 

@@ -7,6 +7,7 @@ defmodule ChatServer.Servers do
   alias ChatServer.Servers.Channel
   alias ChatServer.Repo
 
+  alias ChatServer.Servers
   alias ChatServer.Servers.Server
   alias ChatServer.Servers.ServerUser
   alias ChatServer.Servers.Channel
@@ -70,6 +71,18 @@ defmodule ChatServer.Servers do
   """
   def list_servers do
     Repo.all(Server)
+  end
+
+
+  def search_servers(query, amount) do
+    query = from(
+      s in Server,
+      where: s.private == ^false and (ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%")),
+      order_by: [asc: s.id],
+      limit: ^amount
+    )
+
+    Repo.all(query)
   end
 
   @doc """
@@ -139,29 +152,92 @@ defmodule ChatServer.Servers do
   end
 
 
-  def search_messages_in_server(server_id, query, amount, last_message_id \\ 0) do
-    query = case last_message_id do
-      0 ->
-        from(
-          m in Message,
-          where: ilike(m.message, ^"%#{query}%"),
-          preload: [:user, :channel],
-          order_by: [desc: m.id],
-          limit: ^amount
-        )
-      _ ->
-        from(
-          m in Message,
-          where: ilike(m.message, ^"%#{query}%") and m.id < ^last_message_id,
-          preload: [:user, :channel],
-          order_by: [desc: m.id],
-          limit: ^amount
-        )
-    end
+  def list_previous_servers(query, last_server_id, page_size) do
+    all_row_numbers = from(
+      s in Server,
+      select: %{id: s.id, row_number: row_number() |> over(order_by: s.name)},
+      where: ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%"),
+      order_by: [asc: s.name]
+    )
+
+    single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+    |> where([_s, rn], rn.id == ^last_server_id)
+    |> select([s,rn], %{id: rn.id, row_number: rn.row_number})
+
+    query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+    |> with_cte("single_row_number", as: ^single_row_number)
+    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+    |> join(:left, [s, rn], srn in "single_row_number", on: true)
+    |> where([s, rn, srn], rn.row_number < srn.row_number)
+    |> select([s, _rn, _srn], s)
+    |> order_by([s], [desc: s.name])
+    |> limit(^page_size)
 
     Repo.all(query)
   end
 
+  def list_next_servers(query, last_server_id, page_size) do
+    all_row_numbers = from(
+      s in Server,
+      select: %{id: s.id, row_number: row_number() |> over(order_by: s.name)},
+      where: ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%"),
+      order_by: [asc: s.name]
+    )
+
+    single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+    |> where([_s, rn], rn.id == ^last_server_id)
+    |> select([s,rn], %{id: rn.id, row_number: rn.row_number})
+
+    query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+    |> with_cte("single_row_number", as: ^single_row_number)
+    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+    |> join(:left, [s, rn], srn in "single_row_number", on: true)
+    |> where([s, rn, srn], rn.row_number > srn.row_number)
+    |> select([s, _rn, _srn], s)
+    |> order_by([s], [asc: s.name])
+    |> limit(^page_size)
+
+    Repo.all(query)
+  end
+
+  def search_messages_in_server(query, amount) do
+    query = from(
+      m in Message,
+      where: ilike(m.message, ^"%#{query}%"),
+      preload: [:user, :channel],
+      order_by: [desc: m.id],
+      limit: ^amount
+    )
+
+    Repo.all(query)
+  end
+
+
+  def list_previous_search_messages(query, last_message_id, message_amount) do
+    query = from(
+      m in Message,
+      where: m.id < ^last_message_id and ilike(m.message, ^"%#{query}%"),
+      preload: [:user, :channel],
+      order_by: [desc: m.id],
+      limit: ^message_amount
+    )
+
+    Repo.all(query)
+  end
+
+  def list_next_search_messages(query, last_message_id, message_amount) do
+    query = from(
+      m in Message,
+      where: m.id > ^last_message_id and ilike(m.message, ^"%#{query}%"),
+      preload: [:user, :channel],
+      order_by: [asc: m.id],
+      limit: ^message_amount
+    )
+
+    Repo.all(query)
+  end
 
   def list_channel_messages_from_message_id(message_id, message_amount) do
     channel_id = Repo.get!(Message, message_id).channel_id
@@ -276,6 +352,7 @@ defmodule ChatServer.Servers do
         {:ok, default_channel} = Channel.changeset(%Channel{}, %{
           name: "General",
           private: false,
+          is_default: true,
           description: "A channel for general discussions.",
           server_id: server_user.server_id
       })
@@ -292,6 +369,42 @@ defmodule ChatServer.Servers do
 
       server_user
     end)
+  end
+
+  def get_server_default_channel(server_id) do
+    query = from(
+      c in Channel,
+      where: c.server_id == ^server_id and c.is_default == true
+    )
+
+    Repo.one!(query)
+  end
+
+  @doc """
+  Creates a server that belongs to a user
+  """
+  def join_server(user_id, server_id) do
+    server = Servers.get_server!(server_id)
+    default_channel = Servers.get_server_default_channel!(server_id)
+
+    {:ok, server_user} = %ServerUser{}
+    |> ServerUser.changeset(%{
+      user_id: user_id,
+      server_id: server.id,
+      last_selected_channel_id: default_channel.id
+    })
+    |> Repo.insert()
+
+    server_user
+  end
+
+  def leave_server(user_id, server_id) do
+    query = from(
+      su in ServerUser,
+      where: su.user_id == ^user_id and su.server_id == ^server_id
+    )
+    server_user = Repo.one(query)
+    if server_user != nil, do: Repo.delete!(server_user)
   end
 
   @doc """

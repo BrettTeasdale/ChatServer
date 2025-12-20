@@ -1,8 +1,6 @@
 defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
   use ChatServerWeb, :live_component
 
-  import ChatServerWeb.CustomComponents
-
   alias ChatServer.Servers;
   alias ChatServer.Servers.Channel;
 

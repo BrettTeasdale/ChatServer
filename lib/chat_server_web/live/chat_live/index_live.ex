@@ -11,6 +11,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   alias ChatServerWeb.ChatLive.ServerCreateModalComponent
   alias ChatServerWeb.ChatLive.ChannelCreateModalComponent
+  alias ChatServerWeb.ChatLive.FindServerModalComponent
 
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
 
@@ -24,7 +25,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     socket = socket
     |> assign(:modal_action, nil)
-    |> assign(check_errors: false)
+    |> assign(:check_errors, false)
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
@@ -32,11 +33,14 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channels, channels)
     |> assign(:channel_last_message, %{})
     |> assign(:channel_page_data, %{})
-    |> assign(:last_viewport_event, NaiveDateTime.utc_now)
+    |> assign(:last_viewport_event, System.monotonic_time())
     |> assign(:message_page_size, 50)
     |> assign(:sidebar_action, :users)
     |> assign(:search_form, to_form(%{}))
     |> stream(:search_results, [])
+    |> assign(:last_search_viewport_event, System.monotonic_time())
+    |> assign(:search_page_size, 50)
+    |> assign(:search_query, "")
 
     {:ok, socket}
   end
@@ -71,6 +75,7 @@ defmodule ChatServerWeb.ChatLive.Index do
         <div class="h-full w-40 overflow-y-scroll">
           <div>
             <.button phx-click="show_server_create_modal">Create Server</.button>
+            <.button phx-click="show_find_server_modal">Find Server</.button>
           </div>
           <div id="server_list">
             <div :for={server_user <- @server_users}>
@@ -169,6 +174,10 @@ defmodule ChatServerWeb.ChatLive.Index do
           <:header>Create New Channel</:header>
           <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} selected_server_user={@selected_server_user} />
         </.raw_modal>
+
+        <.raw_modal :if={@modal_action == "find_server_modal"} id="find-server-modal" hide_event="hide_modals">
+          <.live_component module={FindServerModalComponent} id="find_server_form" modal_id="find-server-modal" current_user={@current_user} server_users={@server_users}/>
+        </.raw_modal>
       </div>
     """
   end
@@ -176,6 +185,8 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Handle Server Create Modal Events
 
   def handle_event("show_server_create_modal", _, socket), do: {:noreply, assign(socket, :modal_action, "server_create_modal")}
+
+  def handle_event("show_find_server_modal", _, socket), do: {:noreply, assign(socket, :modal_action, "find_server_modal")}
 
   def handle_event("show_channel_create_modal", _, socket), do: {:noreply, assign(socket, :modal_action, "channel_create_modal")}
 
@@ -211,8 +222,8 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def handle_event("prev-page", %{"channel_id" => channel_id, "last_message_id" => last_message_id}, socket) do
     IO.inspect(channel_id, label: "CHANNEL ID")
-    case NaiveDateTime.compare(NaiveDateTime.add(NaiveDateTime.utc_now(), -1), socket.assigns.last_viewport_event) do
-     :gt ->
+    case socket.assigns.last_viewport_event + 500_000_000 < System.monotonic_time do
+     true ->
         IO.inspect("NOT THROTTLED")
         socket = socket
         |> previous_page({:previous_page, channel_id, last_message_id})
@@ -234,21 +245,19 @@ defmodule ChatServerWeb.ChatLive.Index do
     previous_page_messages = Servers.list_previous_channel_messages(channel_id, last_message_id, socket.assigns.message_page_size)
 
     if(previous_page_messages != []) do
-      socket = Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
+      Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
         IO.inspect(message, label: "MESSAGE")
         stream_insert(acc_socket, "messages_#{channel_id}", message, at: 0, limit: 2 * socket.assigns.message_page_size)
       end)
-      |> assign(:last_viewport_event, NaiveDateTime.utc_now())
-
-      socket
+      |> assign(:last_viewport_event, System.monotonic_time())
     else
         socket
     end
   end
 
   def handle_event("next-page", %{"channel_id" => channel_id, "last_message_id" => last_message_id}, socket) do
-    case NaiveDateTime.compare(NaiveDateTime.add(NaiveDateTime.utc_now(), -1), socket.assigns.last_viewport_event) do
-     :gt ->
+    case socket.assigns.last_viewport_event + 500_000_000 < System.monotonic_time do
+     true ->
         IO.inspect("NOT THROTTLED")
         {:noreply, next_page(socket, {:next_page, channel_id, last_message_id})}
       _ ->
@@ -270,13 +279,67 @@ defmodule ChatServerWeb.ChatLive.Index do
     next_page_messages = Servers.list_next_channel_messages(channel_id, last_message_id, socket.assigns.message_page_size)
 
     if(next_page_messages != []) do
-      socket = Enum.reduce(next_page_messages, socket, fn message, acc_socket ->
+      Enum.reduce(next_page_messages, socket, fn message, acc_socket ->
         IO.inspect(message, label: "MESSAGE")
         stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
       end)
-      |> assign(:last_viewport_event, NaiveDateTime.utc_now())
-
+      |> assign(:last_viewport_event, System.monotonic_time())
+    else
       socket
+    end
+  end
+
+  # Search history
+
+  def handle_event("search-prev-page", %{"last_message_id" => last_message_id}, socket) do
+    IO.inspect("search-prev-page")
+    case socket.assigns.last_search_viewport_event + 500_000_000 < System.monotonic_time do
+     true ->
+        {:noreply, previous_search_page(socket, last_message_id)}
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def previous_search_page(socket, last_message_id) when is_binary(last_message_id) do
+    previous_search_page(socket, String.to_integer(last_message_id))
+  end
+
+  def previous_search_page(socket, last_message_id) do
+    previous_search_page_messages = Servers.list_previous_search_messages(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
+
+    if(previous_search_page_messages != []) do
+      Enum.reduce(previous_search_page_messages, socket, fn message, acc_socket ->
+        stream_insert(acc_socket, :search_results, message, at: -1, limit: -2 * socket.assigns.search_page_size)
+      end)
+      |> assign(:last_search_viewport_event, System.monotonic_time())
+    else
+        socket
+    end
+  end
+
+  def handle_event("search-next-page", %{"last_message_id" => last_message_id}, socket) do
+    case socket.assigns.last_search_viewport_event + 500_000_000 < System.monotonic_time do
+     true ->
+        {:noreply, next_search_page(socket, last_message_id)}
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def next_search_page(socket, last_message_id) when is_binary(last_message_id) do
+    next_search_page(socket, String.to_integer(last_message_id))
+  end
+
+  def next_search_page(socket, last_message_id) do
+    IO.inspect("search-next-page")
+    next_search_page_messages = Servers.list_next_search_messages(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
+
+    if(next_search_page_messages != []) do
+      Enum.reduce(next_search_page_messages, socket, fn message, acc_socket ->
+        stream_insert(acc_socket, :search_results, message, at: 0, limit: 2 * socket.assigns.search_page_size)
+      end)
+      |> assign(:last_search_viewport_event, System.monotonic_time())
     else
       socket
     end
@@ -284,7 +347,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   # Handle broadcasts of PubSub events for the server list
 
-  def handle_info({:server_created, %ServerUser{} = _server_user}, socket) do
+  def handle_info({:servers_updated}, socket) do
     {:noreply, assign(socket, :server_users, Servers.list_user_servers(socket.assigns.current_user.id))}
   end
 
@@ -391,7 +454,8 @@ defmodule ChatServerWeb.ChatLive.Index do
   def handle_event("search", %{"query" => query}, socket) do
     socket = socket
     |> assign(:sidebar_action, :search)
-    |> stream(:search_results, Servers.search_messages_in_server(socket.assigns.selected_server_user.server_id, query, 40), reset: true)
+    |> assign(:search_query, query)
+    |> stream(:search_results, Servers.search_messages_in_server(query, 40), reset: true)
 
     {:noreply, socket}
   end
