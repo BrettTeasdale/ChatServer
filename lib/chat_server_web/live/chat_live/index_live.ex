@@ -336,6 +336,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     next_search_page_messages = Servers.list_next_search_messages(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
 
     if(next_search_page_messages != []) do
+      IO.inspect("search-next-page 2")
       Enum.reduce(next_search_page_messages, socket, fn message, acc_socket ->
         stream_insert(acc_socket, :search_results, message, at: 0, limit: 2 * socket.assigns.search_page_size)
       end)

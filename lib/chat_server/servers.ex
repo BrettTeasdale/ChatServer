@@ -77,8 +77,8 @@ defmodule ChatServer.Servers do
   def search_servers(query, amount) do
     query = from(
       s in Server,
-      where: s.private == ^false and (ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%")),
-      order_by: [asc: s.id],
+      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
+      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
       limit: ^amount
     )
 
@@ -155,9 +155,9 @@ defmodule ChatServer.Servers do
   def list_previous_servers(query, last_server_id, page_size) do
     all_row_numbers = from(
       s in Server,
-      select: %{id: s.id, row_number: row_number() |> over(order_by: s.name)},
-      where: ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%"),
-      order_by: [asc: s.name]
+      select: %{id: s.id, row_number: row_number() |> over(order_by: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query))},
+      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
+      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
     )
 
     single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
@@ -180,9 +180,9 @@ defmodule ChatServer.Servers do
   def list_next_servers(query, last_server_id, page_size) do
     all_row_numbers = from(
       s in Server,
-      select: %{id: s.id, row_number: row_number() |> over(order_by: s.name)},
-      where: ilike(s.name, ^"%#{query}%") or ilike(s.description, ^"%#{query}%"),
-      order_by: [asc: s.name]
+      select: %{id: s.id, row_number: row_number() |> over(order_by: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query))},
+      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
+      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
     )
 
     single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
@@ -196,7 +196,7 @@ defmodule ChatServer.Servers do
     |> join(:left, [s, rn], srn in "single_row_number", on: true)
     |> where([s, rn, srn], rn.row_number > srn.row_number)
     |> select([s, _rn, _srn], s)
-    |> order_by([s], [asc: s.name])
+    |> order_by([s], [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)])
     |> limit(^page_size)
 
     Repo.all(query)
@@ -205,7 +205,7 @@ defmodule ChatServer.Servers do
   def search_messages_in_server(query, amount) do
     query = from(
       m in Message,
-      where: ilike(m.message, ^"%#{query}%"),
+      where: fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query),
       preload: [:user, :channel],
       order_by: [desc: m.id],
       limit: ^amount
@@ -218,7 +218,7 @@ defmodule ChatServer.Servers do
   def list_previous_search_messages(query, last_message_id, message_amount) do
     query = from(
       m in Message,
-      where: m.id < ^last_message_id and ilike(m.message, ^"%#{query}%"),
+      where: m.id < ^last_message_id and (fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query)),
       preload: [:user, :channel],
       order_by: [desc: m.id],
       limit: ^message_amount
@@ -230,7 +230,7 @@ defmodule ChatServer.Servers do
   def list_next_search_messages(query, last_message_id, message_amount) do
     query = from(
       m in Message,
-      where: m.id > ^last_message_id and ilike(m.message, ^"%#{query}%"),
+      where: m.id > ^last_message_id and (fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query)),
       preload: [:user, :channel],
       order_by: [asc: m.id],
       limit: ^message_amount
