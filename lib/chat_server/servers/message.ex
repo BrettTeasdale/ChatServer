@@ -8,6 +8,8 @@ defmodule ChatServer.Servers.Message do
     belongs_to :user, ChatServer.Accounts.User
     belongs_to :channel, ChatServer.Servers.Channel
 
+    has_many :uploads, ChatServer.Servers.Upload
+
     timestamps(type: :utc_datetime)
   end
 

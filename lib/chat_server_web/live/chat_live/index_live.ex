@@ -7,6 +7,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   alias ChatServer.Servers.ServerUser
   alias ChatServer.Servers.Channel
   alias ChatServer.Servers.Message
+  alias ChatServer.Servers.Upload
   alias ChatServer.Servers
 
   alias ChatServerWeb.ChatLive.ServerCreateModalComponent
@@ -41,13 +42,14 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:last_search_viewport_event, System.monotonic_time())
     |> assign(:search_page_size, 50)
     |> assign(:search_query, "")
+    |> allow_upload(:message_uploads, accept: :any, max_entries: 10, auto_upload: false)
 
     {:ok, socket}
   end
 
   def render(assigns) do
     ~H"""
-    <div class="fixed top-0 right-0 left-0">
+    <div class="fixed top-0 right-0 left-0" phx-drop-target={@uploads.message_uploads.ref}>
         <div class="float-right mt-0 mb-0 ml-0 mr-8">
           <.simple_form
             for={@search_form}
@@ -77,6 +79,14 @@ defmodule ChatServerWeb.ChatLive.Index do
             <.button phx-click="show_server_create_modal">Create Server</.button>
             <.button phx-click="show_find_server_modal">Find Server</.button>
           </div>
+          <%= for {_ref, msg} <- @uploads.message_uploads.errors do %>
+            <h3><%= Phoenix.Naming.humanize(msg) %></h3>
+          <% end %>
+          <%= for entry <- @uploads.message_uploads.entries do %>
+            <.live_img_preview entry={entry} width="75" />
+            <div class="py-5"><%= entry.progress %>%</div>
+          <% end %>
+
           <div id="server_list">
             <div :for={server_user <- @server_users}>
               <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={@selected_server_user && server_user.id == @selected_server_user.id && "selected"}>
@@ -113,13 +123,18 @@ defmodule ChatServerWeb.ChatLive.Index do
                   </div>
                 </div>
               </div>
-              <div class="w-full">
-                <form
+              <div class="w-full" :if={@selected_channel && channel.id == @selected_channel.id}>
+                <.simple_form
                   class="flex flex-row w-full m-0 p-0"
+                  for={@message_form}
                   id={"server_create_form_#{channel.id}"}
                   phx-submit="send_message"
+                  phx-change="validate_message"
                   phx-value-channel-id={@selected_channel.id}
+                  no-margin={true}
                 >
+                  <.live_file_input id={"upload_#{channel.id}"} upload={@uploads.message_uploads} />
+
                   <div class="flex-1 m-0">
                     <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
                     <input type="text" name="message[message]" class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400" placeholder="Message">
@@ -127,58 +142,56 @@ defmodule ChatServerWeb.ChatLive.Index do
                   <div class="w-32 m-0">
                     <.button class="w-32 m-0">Send Message</.button>
                   </div>
-                </form>
+                </.simple_form>
               </div>
             </div>
           <% end %>
-              <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
-                Search
-                <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
-                  <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id}>
-                    <div class="font-semibold channel_name">
-                      {message.channel.name}
-                    </div>
-                    <div class="w-full">
-                      <span class="user">{message.user.username}</span>
-                      <br/>{message.message}
-                    </div>
+            <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
+              Search
+              <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
+                <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id}>
+                  <div class="font-semibold channel_name">
+                    {message.channel.name}
+                  </div>
+                  <div class="w-full">
+                    <span class="user">{message.user.username}</span>
+                    <br/>{message.message}
                   </div>
                 </div>
               </div>
-              <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@sidebar_action == :users || " hidden")]}>
+            </div>
+            <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@sidebar_action == :users || " hidden")]}>
+              Users
+              <div class="flex-1">
                 Users
-                <div class="flex-1">
-                Users
-                  <!--
-                  <div :for={channel <- @channels}>
-                    <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
-                      # {channel.name}
-                    </button>
-                  </div>
-                  -->
+                <!--
+                <div :for={channel <- @channels}>
+                  <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
+                    # {channel.name}
+                  </button>
                 </div>
+                -->
               </div>
             </div>
           </div>
         </div>
-
-
       </div>
-      <div>
-        <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
-          <:header>Create New Server</:header>
-          <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
-        </.raw_modal>
+    </div>
+    <div>
+      <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
+        <:header>Create New Server</:header>
+        <.live_component module={ServerCreateModalComponent} id="chat_server_create_form" modal_id="server-create-modal" current_user={@current_user} />
+      </.raw_modal>
 
-        <.raw_modal :if={@modal_action == "channel_create_modal"} id="channel-create-modal" hide_event="hide_modals">
-          <:header>Create New Channel</:header>
-          <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} selected_server_user={@selected_server_user} />
-        </.raw_modal>
+      <.raw_modal :if={@modal_action == "channel_create_modal"} id="channel-create-modal" hide_event="hide_modals">
+        <:header>Create New Channel</:header>
+        <.live_component module={ChannelCreateModalComponent} id="chat_channel_create_form" modal_id="channel-create-modal" current_user={@current_user} selected_server_user={@selected_server_user} />
+      </.raw_modal>
 
-        <.raw_modal :if={@modal_action == "find_server_modal"} id="find-server-modal" hide_event="hide_modals">
-          <.live_component module={FindServerModalComponent} id="find_server_form" modal_id="find-server-modal" current_user={@current_user} server_users={@server_users}/>
-        </.raw_modal>
-      </div>
+      <.raw_modal :if={@modal_action == "find_server_modal"} id="find-server-modal" hide_event="hide_modals">
+        <.live_component module={FindServerModalComponent} id="find_server_form" modal_id="find-server-modal" current_user={@current_user} server_users={@server_users}/>
+      </.raw_modal>
+    </div>
     """
   end
 
@@ -458,6 +471,21 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:search_query, query)
     |> stream(:search_results, Servers.search_messages_in_server(query, 40), reset: true)
 
+    {:noreply, socket}
+  end
+
+  def update(%{message_uploads: message_uploads} = assigns, socket) do
+    changeset = Uploads.change_upload(message_uploads)
+
+    socket = socket
+    |> allow_upload(:message_uploads, accept: :any, max_entries: 10, auto_upload: false)
+    |> assign(assigns)
+    |> assign(:form, to_form(changeset))
+
+    {:ok, socket}
+  end
+
+  def handle_event("validate_message", _assigns, socket) do
     {:noreply, socket}
   end
 end
