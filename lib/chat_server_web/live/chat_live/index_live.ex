@@ -135,11 +135,11 @@ defmodule ChatServerWeb.ChatLive.Index do
                 >
                   <.live_file_input id={"upload_#{channel.id}"} upload={@uploads.message_uploads} />
 
-                  <div class="flex-1 m-0">
+                  <div class="flex-1 m-0 w-full">
                     <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
                     <input type="text" name="message[message]" class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400" placeholder="Message">
                   </div>
-                  <div class="w-32 m-0">
+                  <div class="w-32 m-0 w-full">
                     <.button class="w-32 m-0">Send Message</.button>
                   </div>
                 </.simple_form>
@@ -255,7 +255,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def previous_page(socket, {:previous_page, channel_id, last_message_id}) do
-    previous_page_messages = Servers.list_previous_channel_messages(channel_id, last_message_id, socket.assigns.message_page_size)
+    previous_page_messages = Servers.list_channel_messages_previous(channel_id, last_message_id, socket.assigns.message_page_size)
 
     if(previous_page_messages != []) do
       Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
@@ -289,7 +289,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def next_page(socket, {:next_page, channel_id, last_message_id}) do
-    next_page_messages = Servers.list_next_channel_messages(channel_id, last_message_id, socket.assigns.message_page_size)
+    next_page_messages = Servers.list_channel_messages_next(channel_id, last_message_id, socket.assigns.message_page_size)
 
     if(next_page_messages != []) do
       Enum.reduce(next_page_messages, socket, fn message, acc_socket ->
@@ -346,7 +346,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def next_search_page(socket, last_message_id) do
     IO.inspect("search-next-page")
-    next_search_page_messages = Servers.list_next_search_messages(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
+    next_search_page_messages = Servers.search_messages_next(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
 
     if(next_search_page_messages != []) do
       IO.inspect("search-next-page 2")
@@ -428,7 +428,7 @@ defmodule ChatServerWeb.ChatLive.Index do
         IO.inspect(bottom_message, label: "BOTTOM MESSAGE")
 
         {channel.id, %{
-          top_message: Servers.get_channel_top_message!(channel.id) || %Message{},
+          top_message: Servers.get_channel_first_message(channel.id) || %Message{},
           bottom_message: bottom_message,
         }}
     end
@@ -469,7 +469,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     socket = socket
     |> assign(:sidebar_action, :search)
     |> assign(:search_query, query)
-    |> stream(:search_results, Servers.search_messages_in_server(query, 40), reset: true)
+    |> stream(:search_results, Servers.search_messages(query, 40), reset: true)
 
     {:noreply, socket}
   end

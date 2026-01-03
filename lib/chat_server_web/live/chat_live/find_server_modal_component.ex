@@ -133,14 +133,9 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     end
   end
 
-  def previous_page(socket, {:previous_page, last_server_id}) when is_binary(last_server_id) do
-    last_server_id = String.to_integer(last_server_id)
-
-    previous_page(socket, {:previous_page, last_server_id})
-  end
-
   def previous_page(socket, {:previous_page, last_server_id}) do
-    previous_page_servers = Servers.list_previous_servers(socket.assigns.query, last_server_id, socket.assigns.page_size)
+    last_server_id = String.to_integer(last_server_id)
+    previous_page_servers = Servers.search_servers_previous(socket.assigns.query, last_server_id, socket.assigns.page_size)
 
     if(previous_page_servers != []) do
       Enum.reduce(previous_page_servers, socket, fn server, acc_socket ->
@@ -162,14 +157,9 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     end
   end
 
-  def next_page(socket, {:next_page, last_server_id}) when is_binary(last_server_id) do
-    last_server_id = String.to_integer(last_server_id)
-
-    next_page(socket, {:next_page, last_server_id})
-  end
-
   def next_page(socket, {:next_page, last_server_id}) do
-    next_page_servers = Servers.list_next_servers(socket.assigns.query, last_server_id, socket.assigns.page_size)
+    last_server_id = String.to_integer(last_server_id)
+    next_page_servers = Servers.search_servers_next(socket.assigns.query, last_server_id, socket.assigns.page_size)
 
     if(next_page_servers != []) do
       Enum.reduce(next_page_servers, socket, fn server, acc_socket ->
