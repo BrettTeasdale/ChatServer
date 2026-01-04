@@ -10,23 +10,39 @@ defmodule ChatServerWeb.ChatLive.Index do
   alias ChatServer.Servers.Upload
   alias ChatServer.Servers
 
+  alias ChatServerWeb.Presence
+
   alias ChatServerWeb.ChatLive.ServerCreateModalComponent
   alias ChatServerWeb.ChatLive.ChannelCreateModalComponent
   alias ChatServerWeb.ChatLive.FindServerModalComponent
 
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
 
+  defp presence_topic do
+    "chat_users"
+  end
+
   def mount(_params, _session, socket) do
 
     if connected?(socket) do
       Servers.server_list_subscribe(socket.assigns.current_user.id)
+
+      {:ok, _} = Presence.track(self(), presence_topic(), socket.assigns.current_user.username, %{
+        online_at: System.system_time(:second)
+      })
+
+      Phoenix.PubSub.subscribe(ChatServer.PubSub, "updates:" <> presence_topic())
     end
+
+    presences = Presence.list(presence_topic())
+    |> Enum.map(fn {username, %{metas: metas}} -> %{id: username, metas: List.first(metas)} end)
 
     channels = []
 
     socket = socket
     |> assign(:modal_action, nil)
     |> assign(:check_errors, false)
+    |> stream(:presences, presences)
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
@@ -161,16 +177,11 @@ defmodule ChatServerWeb.ChatLive.Index do
               </div>
             </div>
             <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@sidebar_action == :users || " hidden")]}>
-              Users
-              <div class="flex-1">
-                Users
-                <!--
-                <div :for={channel <- @channels}>
-                  <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
-                    # {channel.name}
-                  </button>
+              <span class="font-semibold">Users</span>
+              <div class="flex-1" phx-update="stream" id="users">
+                <div :for={{dom_id, presence} <- @streams.presences} id={dom_id} class="user_presence">
+                  <span class="username">{presence.id}</span>
                 </div>
-                -->
               </div>
             </div>
           </div>
@@ -506,5 +517,18 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     {:noreply, socket}
   end
+
+  def handle_info({:user_joined, presence}, socket) do
+    {:noreply, stream_insert(socket, :presences, presence)}
+  end
+
+  def handle_info({:user_left, presence}, socket) do
+    if presence.metas == [] do
+      {:noreply, stream_delete(socket, :presences, presence)}
+    else
+      {:noreply, stream_insert(socket, :presences, presence)}
+    end
+  end
+
 
 end
