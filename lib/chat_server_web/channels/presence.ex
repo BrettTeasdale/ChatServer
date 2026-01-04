@@ -14,21 +14,21 @@ defmodule ChatServerWeb.Presence do
   end
 
   def handle_metas(topic, %{joins: joins, leaves: leaves}, presences, state) do
-    for {username, %{metas: metas}} <- joins do
-      presence = %{id: username, metas: Map.fetch!(presences, username)}
+    for {user_id, %{metas: metas}} <- joins do
+      presence = %{id: user_id, metas: Map.fetch!(presences, user_id)}
 
       msg = {:user_joined, presence}
 
       Phoenix.PubSub.local_broadcast(ChatServer.PubSub, "updates:" <> topic, msg)
     end
 
-    for {username, %{metas: metas}} <- leaves do
-      metas = case Map.fetch(presences, username) do
+    for {user_id, %{metas: metas}} <- leaves do
+      metas = case Map.fetch(presences, user_id) do
         {:ok, presence_metas} -> presence_metas
         :error -> []
       end
 
-      presence = %{id: username, metas: metas}
+      presence = %{id: user_id, metas: metas}
 
       msg = {:user_left, presence}
 

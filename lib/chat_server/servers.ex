@@ -77,6 +77,25 @@ defmodule ChatServer.Servers do
   def get_server!(id), do: Repo.get!(Server, id)
 
   @doc """
+  Returns the list of a channels a user belongs to.
+
+  ## Examples
+
+      iex> list_server_user_channels()
+      [%Channel{}, ...]
+
+  """
+  def list_users_belonging_to_server(server_id) when is_number(server_id) or is_binary(server_id) do
+    from(
+      u in User,
+      join: su in ServerUser, on: su.user_id == u.id,
+      where: su.server_id == ^server_id,
+      order_by: [asc: u.username]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the list of servers.
 
   ## Examples

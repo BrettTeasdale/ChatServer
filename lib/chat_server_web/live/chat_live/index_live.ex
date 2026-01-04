@@ -9,6 +9,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   alias ChatServer.Servers.Message
   alias ChatServer.Servers.Upload
   alias ChatServer.Servers
+  alias ChatServer.Accounts
 
   alias ChatServerWeb.Presence
 
@@ -27,27 +28,22 @@ defmodule ChatServerWeb.ChatLive.Index do
     if connected?(socket) do
       Servers.server_list_subscribe(socket.assigns.current_user.id)
 
-      {:ok, _} = Presence.track(self(), presence_topic(), socket.assigns.current_user.username, %{
+      {:ok, _} = Presence.track(self(), presence_topic(), socket.assigns.current_user.id, %{
         online_at: System.system_time(:second)
       })
 
       Phoenix.PubSub.subscribe(ChatServer.PubSub, "updates:" <> presence_topic())
     end
 
-    presences = Presence.list(presence_topic())
-    |> Enum.map(fn {username, %{metas: metas}} -> %{id: username, metas: List.first(metas)} end)
-
-    channels = []
-
     socket = socket
     |> assign(:modal_action, nil)
     |> assign(:check_errors, false)
-    |> stream(:presences, presences)
+    |> stream(:presences, [])
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
     |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
-    |> assign(:channels, channels)
+    |> assign(:channels, [])
     |> assign(:channel_last_message, %{})
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, System.monotonic_time())
@@ -133,6 +129,9 @@ defmodule ChatServerWeb.ChatLive.Index do
                 <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message" data-message_id={message.id}>
                   <div class="font-semibold user">
                     {message.user.username}
+                    <time phx-hook="updateTime" id={"message_#{message.id}"} datetime={DateTime.to_iso8601(message.inserted_at)}>
+                      <%= message.inserted_at %>
+                    </time>
                   </div>
                   <div class="w-full">
                     {message.message}
@@ -180,7 +179,17 @@ defmodule ChatServerWeb.ChatLive.Index do
               <span class="font-semibold">Users</span>
               <div class="flex-1" phx-update="stream" id="users">
                 <div :for={{dom_id, presence} <- @streams.presences} id={dom_id} class="user_presence">
-                  <span class="username">{presence.id}</span>
+                  <%= if presence.online do %>
+                  <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span class="text-gray-500 text-sm">{presence.id}</span>
+                  </div>
+                  <% else %>
+                  <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-gray-500"></span>
+                    <span class="text-gray-500 text-sm">{presence.id}</span>
+                  </div>
+                  <% end %>
                 </div>
               </div>
             </div>
@@ -437,6 +446,18 @@ defmodule ChatServerWeb.ChatLive.Index do
     selected_channel = Servers.get_channel!(if channel_id != nil, do: channel_id, else: selected_server_user.last_selected_channel_id)
     channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
+    users_belonging_to_server = Servers.list_users_belonging_to_server(selected_server_user.server_id)
+    presences = for user <- users_belonging_to_server do
+      case Presence.get_by_key(presence_topic(), user.id) do
+        nil ->
+          %{id: user.username, online: false}
+        presence ->
+          %{id: user.username, online: true}
+      end
+    end
+
+    socket = stream(socket, :presences, presences, reset: true)
+
     latest_channel_messages = for channel <- channels, into: %{} do
       {channel.id, Servers.list_latest_channel_messages(channel.id, socket.assigns.message_page_size)}
     end
@@ -519,14 +540,34 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def handle_info({:user_joined, presence}, socket) do
-    {:noreply, stream_insert(socket, :presences, presence)}
+    if Map.get(socket.assigns.selected_server_user, :id, false) do
+      user = Accounts.get_user!(presence.id)
+      new_presence = %{
+        id: user.username,
+        online: true
+      }
+      {:noreply, stream_insert(socket, :presences, new_presence)}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info({:user_left, presence}, socket) do
-    if presence.metas == [] do
-      {:noreply, stream_delete(socket, :presences, presence)}
+    if Map.get(socket.assigns.selected_server_user, :id, false) do
+      user =  Accounts.get_user!(presence.id)
+      new_presence = %{
+        id: user.username
+      }
+
+      IO.inspect(presence.metas, label: "LEFT METAS")
+
+      if presence.metas == [] do
+        {:noreply, stream_insert(socket, :presences, Map.put(new_presence, :online, false))}
+      else
+        {:noreply, stream_insert(socket, :presences, Map.put(new_presence, :online,  true))}
+      end
     else
-      {:noreply, stream_insert(socket, :presences, presence)}
+      {:noreply, socket}
     end
   end
 
