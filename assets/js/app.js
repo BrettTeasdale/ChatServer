@@ -2,6 +2,7 @@
 // to get started and then uncomment the line below.
 // import "./user_socket.js"
 
+import "./data-confirm.js"
 
 let Hooks = {}
 
@@ -152,6 +153,25 @@ Hooks.updateTime = {
   }
 }
 
+
+Hooks.contextMenu = {
+  mounted() {
+    this.el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const menu = document.getElementById(this.el.dataset.context_menu_id);
+      if (menu) {
+        menu.style.position = "absolute";
+        menu.style.display = "block";
+        menu.style.left = e.clientX + "px";
+        menu.style.top = e.clientY + "px";
+      }
+    });
+    document.addEventListener("click", () => {
+      const menu = document.getElementById(this.el.dataset.context_menu_id);
+      if (menu) menu.style.display = "none";
+    });
+  }
+}
 
 
 

@@ -44,7 +44,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:selected_channel, %Channel{})
     |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
     |> assign(:channels, [])
-    |> assign(:channel_last_message, %{})
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, System.monotonic_time())
     |> assign(:message_page_size, 50)
@@ -54,6 +53,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:last_search_viewport_event, System.monotonic_time())
     |> assign(:search_page_size, 50)
     |> assign(:search_query, "")
+    |> assign(:default_channel_id, nil)
     |> allow_upload(:message_uploads, accept: :any, max_entries: 10, auto_upload: false)
 
     {:ok, socket}
@@ -114,9 +114,24 @@ defmodule ChatServerWeb.ChatLive.Index do
           </div>
           <div class="flex-1">
             <div :for={channel <- @channels}>
-              <button phx-click="select_channel" phx-value-channel-id={channel.id} class={@selected_channel && channel.id == @selected_channel.id && "selected"}>
+              <div phx-click="select_channel" phx-value-channel-id={channel.id} class={[@selected_channel && channel.id == @selected_channel.id && "selected", "w-full"]} phx-hook="contextMenu" id={"select_channel_#{channel.id}"} data-context_menu_id={if @default_channel_id != channel.id, do: "channel_context_#{channel.id}", else: ""}>
                 # {channel.name}
-              </button>
+              </div>
+              <div
+                  :if={@default_channel_id != channel.id}
+                  id={"channel_context_#{channel.id}"}
+                  class="context_menu hidden"
+                >
+                <.button
+                  data-confirm="This action <b>cannot</b> be undone."
+                  data-confirm-title={"Delete channel \"#{channel.name}\"?"}
+                  data-confirm-button="Delete Channel"
+                  data-confirm-variant="danger"
+                  data-confirm-icon="hero-exclamation-triangle"
+                  phx-click="delete_channel"
+                  phx-value-channel_id={channel.id}
+                  class="context_menu_item">Delete Channel</.button>
+              </div>
             </div>
           </div>
         </div>
@@ -390,6 +405,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     socket = socket
     |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.server_id))
+    |> assign(:selected_channel, channel)
     |> stream("messages_#{channel.id}", [])
 
     {:noreply, socket}
@@ -402,15 +418,24 @@ defmodule ChatServerWeb.ChatLive.Index do
     ## current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
 
     socket = if !Map.get(bottom_message, :id) || (Map.get(bottom_message, :id, 0) == Map.get(Map.get(Map.get(socket.assigns.channel_page_data, message.channel_id), :bottom_message), :id)) do
-      IO.inspect("YES")
+      IO.inspect(socket.assigns.channel_page_data, label: "CHANNEL PAGE DATA")
+
+      new_channel_page_data_entry = Map.get(socket.assigns.channel_page_data, message.channel.id, %{})
+      |> Map.put(:bottom_message, message)
+
+      new_channel_page_data_entry = if !Map.get(new_channel_page_data_entry, :top_message) do
+        Map.put(new_channel_page_data_entry, :top_message, message)
+      else
+        new_channel_page_data_entry
+      end
+
       socket
       |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
-      #|> assign(:channel_last_message, Map.put(socket.assigns.channel_last_message, message.channel.id, message))
-      |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, message.channel.id, %{socket.assigns.channel_page_data[message.channel.id] |
-        bottom_message: message,
-      }))
+      |> assign(
+        :channel_page_data,
+        Map.put(socket.assigns.channel_page_data, message.channel.id, new_channel_page_data_entry)
+      )
     else
-      IO.inspect("no")
       socket
     end
 
@@ -471,6 +496,8 @@ defmodule ChatServerWeb.ChatLive.Index do
         }}
     end
 
+    default_channel = Enum.find(channels, fn channel -> channel.is_default end)
+
     socket = socket
     |> assign(:modal_action, nil)
     |> assign(:selected_server_user, selected_server_user)
@@ -478,6 +505,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:server_users, server_users)
     |> assign(:channels, channels)
     |> assign(:channel_page_data, channel_page_data)
+    |> assign(:default_channel_id, Map.get(default_channel, :id, nil))
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
       stream(acc_socket, "messages_#{channel.id}", (if selected_channel.id == channel_id, do: messages, else: Map.get(latest_channel_messages, channel.id)), reset: true)
@@ -571,5 +599,24 @@ defmodule ChatServerWeb.ChatLive.Index do
     end
   end
 
+
+  def handle_event("delete_channel", %{"channel_id" => channel_id}, socket) do
+    Servers.delete_channel(channel_id)
+
+    Servers.channel_list_broadcast(socket.assigns.current_user.id, socket.assigns.selected_server_user.server_id, {:channel_deleted, channel_id})
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:channel_deleted, channel_id}, socket) do
+    Servers.chat_unsubscribe(channel_id)
+
+    socket = socket
+    |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.server_id))
+    |> assign(:channel_page_data, Map.delete(socket.assigns.channel_page_data, channel_id)
+    |> stream("messages_#{channel_id}", [], reset: true))
+
+    {:noreply, socket}
+  end
 
 end

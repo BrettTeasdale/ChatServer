@@ -89,6 +89,7 @@ defmodule ChatServerWeb do
       import Phoenix.HTML
       # Core UI components
       import ChatServerWeb.CoreComponents
+      import ChatServerWeb.CustomComponents
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS

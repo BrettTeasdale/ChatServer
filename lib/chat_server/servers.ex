@@ -418,7 +418,13 @@ defmodule ChatServer.Servers do
 
   """
   def get_channel_first_message(channel_id) do
-    from(m in Message, where: m.channel_id == ^channel_id, order_by: [asc: m.inserted_at], limit: 1)
+    from(
+      m in Message,
+      where: m.channel_id == ^channel_id,
+      preload: [:user, :channel],
+      order_by: [asc: m.inserted_at],
+      limit: 1
+    )
     |> Repo.one()
   end
 
@@ -660,7 +666,25 @@ defmodule ChatServer.Servers do
       {:error, %Ecto.Changeset{}}
 
   """
+  def delete_channel(channel_id) when is_number(channel_id) or is_binary(channel_id) do
+    Repo.delete_all(from(m in Message, where: m.channel_id == ^channel_id))
+    Repo.delete_all(from(c in Channel, where: c.id == ^channel_id))
+  end
+
+  @doc """
+  Deletes a channel.
+
+  ## Examples
+
+      iex> delete_channel(channel)
+      {:ok, %Channel{}}
+
+      iex> delete_channel(channel)
+      {:error, %Ecto.Changeset{}}
+
+  """
   def delete_channel(%Channel{} = channel) do
+    Repo.delete_all(from(m in Message, where: m.channel_id == ^channel.id))
     Repo.delete(channel)
   end
 
@@ -696,8 +720,7 @@ defmodule ChatServer.Servers do
     |> Repo.insert()
 
     message = message
-    |> Repo.preload(:user)
-    |> Repo.preload(:channel)
+    |> Repo.preload([:user, :channel])
 
     {:ok, message}
   end

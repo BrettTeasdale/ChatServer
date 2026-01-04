@@ -4,4 +4,28 @@
     <.flash_group flash={@flash} />
     {@inner_content}
   <!--</div>-->
+
+  <!-- Data Confirm Modal -->
+  <.data_confirm_modal id="data-confirm-modal" phx-update="ignore" on_cancel={JS.dispatch("data-confirm:cancel")} show={}>
+    <div class="space-y-2 text-center">
+      <h2 class="text-lg font-bold mx-auto">
+      <.data_confirm_icon id="data-confirm-icon" data-class="size-10 hidden" name="hero-ignoreme" />
+      <span id="data-confirm-title"></span>
+      </h2>
+    </div>
+
+    <p id="data-confirm-message" class="mt-4"></p>
+    
+    <div class="flex gap-2 mt-4">
+      <.data_confirm_button
+        :for={variant <- ~w(primary danger)}
+        id={"data-confirm-button-#{variant}"}
+        variant={variant}
+        phx-click={JS.dispatch("data-confirm:confirm")}
+        class="grow"
+      >
+      </.data_confirm_button>
+      <.data_confirm_button variant="outline" phx-click={JS.dispatch("data-confirm:cancel")}>Cancel</.data_confirm_button>
+    </div>
+  </.data_confirm_modal>
 </main>
