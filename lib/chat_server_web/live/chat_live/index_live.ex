@@ -149,7 +149,7 @@ defmodule ChatServerWeb.ChatLive.Index do
             <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
               Search
               <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
-                <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id}>
+                <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id} phx-click="select_search_message" phx-value-message_id={message.id}>
                   <div class="font-semibold channel_name">
                     {message.channel.name}
                   </div>
@@ -403,6 +403,13 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   # Handle select server event
   def handle_event("select_server_user", %{"server-user-id" => server_user_id}, socket) do
+    {:noreply, select_server_user(socket, String.to_integer(server_user_id))}
+  end
+
+  def select_server_user(socket, server_user_id, params \\ []) do
+    channel_id = Keyword.get(params, :channel_id, nil) # override default channel
+    messages = Keyword.get(params, :messages, nil) # messages for the current channel
+
     # Get what will be the previous selected server user
     %{selected_server_user: previous_selected_server_user } = socket.assigns
 
@@ -416,7 +423,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     selected_server_user = Servers.get_server_user!(server_user_id)
     server_users = Servers.list_user_servers(socket.assigns.current_user.id)
-    selected_channel = Servers.get_channel!(selected_server_user.last_selected_channel_id)
+    selected_channel = Servers.get_channel!(if channel_id != nil, do: channel_id, else: selected_server_user.last_selected_channel_id)
     channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
     latest_channel_messages = for channel <- channels, into: %{} do
@@ -425,7 +432,6 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     channel_page_data = for channel <- channels, into: %{} do
         bottom_message = Map.get(latest_channel_messages, channel.id) |> List.last(%Message{})
-        IO.inspect(bottom_message, label: "BOTTOM MESSAGE")
 
         {channel.id, %{
           top_message: Servers.get_channel_first_message(channel.id) || %Message{},
@@ -442,7 +448,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channel_page_data, channel_page_data)
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
-      stream(acc_socket, "messages_#{channel.id}", Map.get(latest_channel_messages, channel.id), reset: true)
+      stream(acc_socket, "messages_#{channel.id}", (if selected_channel.id == channel_id, do: messages, else: Map.get(latest_channel_messages, channel.id)), reset: true)
     end)
 
     if connected?(socket) do
@@ -451,7 +457,7 @@ defmodule ChatServerWeb.ChatLive.Index do
       for channel <- channels, do: Servers.chat_subscribe(channel.id)
     end
 
-    {:noreply, socket}
+    socket
   end
 
   # Handle select server event
@@ -488,4 +494,17 @@ defmodule ChatServerWeb.ChatLive.Index do
   def handle_event("validate_message", _assigns, socket) do
     {:noreply, socket}
   end
+
+  def handle_event("select_search_message", %{"message_id" => message_id}, socket) do
+    message = Servers.get_message!(message_id, [:channel, :user])
+    server_user = Servers.get_server_user_by_server_and_user!(message.channel.server_id, socket.assigns.current_user.id)
+
+    IO.inspect(Servers.list_channel_messages_from_message_id(message_id, socket.assigns.message_page_size), label: "MESSAGES1000")
+
+    socket = socket
+    |> select_server_user(server_user.id, channel_id: message.channel.id, messages: Servers.list_channel_messages_from_message_id(message_id, socket.assigns.message_page_size))
+
+    {:noreply, socket}
+  end
+
 end

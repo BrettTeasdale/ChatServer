@@ -252,8 +252,34 @@ defmodule ChatServer.Servers do
 
   """
   def list_user_servers(user_id) when is_number(user_id) do
-    from(su in ServerUser, where: su.user_id == ^user_id, preload: [:server])
+    from(
+      su in ServerUser,
+      join: s in Server, on: s.id == su.server_id,
+      where: su.user_id == ^user_id,
+      preload: [:server],
+      order_by: [asc: s.name]
+    )
     |> Repo.all()
+  end
+
+
+  @doc """
+  Gets a single message.
+
+  Raises `Ecto.NoResultsError` if the Server does not exist.
+
+   ## Examples
+
+      iex> get_message!(123)
+      %Server{}
+
+      iex> get_message!(456)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_message!(id, preload \\ []) do
+    Repo.get!(Message, id)
+    |> Repo.preload(preload)
   end
 
   @doc """
@@ -307,12 +333,18 @@ defmodule ChatServer.Servers do
     above = from(
       m in Message,
       where: m.channel_id == ^channel_id and m.id > ^message_id,
-      preload: [:user, :channel],
       order_by: [asc: m.id],
       limit: ^message_amount
     )
 
-    Repo.all(union(subquery(below), ^above))
+    union = from(
+      m in subquery(union(subquery(below), ^above)),
+      order_by: [asc: m.id],
+      preload: [:user, :channel],
+      limit: ^message_amount
+    )
+
+    Repo.all(union)
   end
 
   @doc """
@@ -452,6 +484,29 @@ defmodule ChatServer.Servers do
   def get_server_user!(server_user_id) when is_number(server_user_id) or is_binary(server_user_id) do
     Repo.get!(ServerUser, server_user_id)
     |> Repo.preload([:last_selected_channel, :server])
+  end
+
+
+  @doc """
+  Gets a single server user record.
+
+  Raises `Ecto.NoResultsError` if the ServerUser does not exist.
+
+  ## Examples
+
+      iex> get_server_user!(123)
+      %ServerUser{}
+
+      iex> get_server_user!(456)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_server_user_by_server_and_user!(server_user_id, user_id) when (is_number(server_user_id) or is_binary(server_user_id)) and (is_number(user_id) or is_binary(user_id)) do
+    from(
+      su in ServerUser,
+      where: su.server_id == ^server_user_id and su.user_id == ^user_id
+    )
+    |> Repo.one!()
   end
 
   @doc """
