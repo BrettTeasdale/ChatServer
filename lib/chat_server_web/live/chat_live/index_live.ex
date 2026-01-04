@@ -431,10 +431,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
       socket
       |> stream_insert("messages_#{message.channel.id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
-      |> assign(
-        :channel_page_data,
-        Map.put(socket.assigns.channel_page_data, message.channel.id, new_channel_page_data_entry)
-      )
+      |> assign(:channel_page_data, Map.put(socket.assigns.channel_page_data, message.channel.id, new_channel_page_data_entry))
     else
       socket
     end
@@ -613,8 +610,8 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     socket = socket
     |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.server_id))
-    |> assign(:channel_page_data, Map.delete(socket.assigns.channel_page_data, channel_id)
-    |> stream("messages_#{channel_id}", [], reset: true))
+    |> assign(:channel_page_data, Map.delete(socket.assigns.channel_page_data, channel_id))
+    |> stream("messages_#{channel_id}", [], reset: true)
 
     {:noreply, socket}
   end
