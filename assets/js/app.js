@@ -53,8 +53,6 @@ Hooks.findServerScroll = {
     let threshold = 5;
 
     el.addEventListener("scroll", () => {
-      console.log("TEST");
-
       const now = Date.now();
       
       const lastCheck = last_check_search;
@@ -158,9 +156,12 @@ Hooks.contextMenu = {
   mounted() {
     this.el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+
+      document.querySelectorAll(".context_menu").forEach(el => el.style.display = "none");
+
       const menu = document.getElementById(this.el.dataset.context_menu_id);
       if (menu) {
-        menu.style.position = "absolute";
+        menu.style.position = "fixed";
         menu.style.display = "block";
         menu.style.left = e.clientX + "px";
         menu.style.top = e.clientY + "px";

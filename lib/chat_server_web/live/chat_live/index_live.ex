@@ -61,172 +61,253 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   def render(assigns) do
     ~H"""
-    <div class="fixed top-0 right-0 left-0" phx-drop-target={@uploads.message_uploads.ref}>
-        <div class="float-right mt-0 mb-0 ml-0 mr-8">
-          <.simple_form
-            for={@search_form}
-            id="form"
-            phx-submit="search"
-            no_margin={true}
+    <div class="flex h-screen bg-gray-900 text-gray-100">
+      <!-- Server Sidebar -->
+      <div class="w-20 bg-gray-800 flex flex-col items-center py-4 gap-4 border-r border-gray-700">
+        <div id="server_list" class="flex flex-col gap-4 w-full overflow-y-scroll">
+          <div :for={server_user <- @server_users} class="relative group">
+            <div
+              phx-click="select_server_user"
+              phx-value-server-user-id={server_user.id}
+              phx-hook="contextMenu"
+              id={"select_server_#{server_user.server.id}"}
+              data-context_menu_id={"server_context_#{server_user.server.id}"}
+              class={[
+                "w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center cursor-pointer transition-all hover:rounded-lg mx-auto ",
+                @selected_server_user && server_user.id == @selected_server_user.id && "rounded-lg bg-indigo-500"
+              ]}
+              title={server_user.server.name}
+            >
+              <span class="font-bold text-sm">{String.first(server_user.server.name)}</span>
+            </div>
+            <div
+              id={"server_context_#{server_user.server.id}"}
+              class="context_menu hidden absolute left-16 bg-gray-800 rounded shadow-lg z-10 min-w-max"
+            >
+              <.button
+                data-confirm="This action <b>cannot</b> be undone."
+                data-confirm-title={"Delete server \"#{server_user.server.name}\"?"}
+                data-confirm-button="Delete Server"
+                data-confirm-variant="danger"
+                data-confirm-icon="hero-exclamation-triangle"
+                phx-click="delete_server"
+                phx-value-server_id={server_user.server.id}
+                class="context_menu_item w-full text-left px-4 py-2 hover:bg-gray-700 text-red-400"
+              >
+                Delete Server
+              </.button>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-700 pt-4 w-full flex flex-col gap-2">
+          <button
+            phx-click="show_server_create_modal"
+            class="w-12 h-12 rounded-full bg-gray-700 hover:bg-green-600 flex items-center justify-center transition-colors mx-auto text-xl"
+            title="Create Server"
           >
-          <input type="text" name="query" value="" placeholder="Search..." />
-          </.simple_form>
-        </div>
-      <div class="w-full text-center" :if={Map.get(@selected_server_user, :id)}>
-        {@selected_server_user.server.name}
-      </div>
-      <div class="w-full text-center" :if={!Map.get(@selected_server_user, :id)}>
-        Select a Server
-      </div>
-      <div class="w-full">
-        <div class="text-center">
-          <h3># {@selected_channel.name}</h3>
+            +
+          </button>
+          <button
+            phx-click="show_find_server_modal"
+            class="w-12 h-12 rounded-full bg-gray-700 hover:bg-blue-600 flex items-center justify-center transition-colors mx-auto text-xl"
+            title="Find Server"
+          >
+            🔍
+          </button>
         </div>
       </div>
-    </div>
-    <div class="flex flex-col w-screen h-screen m-0 pl-0 pr-0 pb-0 pt-10">
-      <div class="flex flex-row h-full p-0 m-0">
-        <div class="h-full w-40 overflow-y-scroll">
-          <div>
-            <.button phx-click="show_server_create_modal">Create Server</.button>
-            <.button phx-click="show_find_server_modal">Find Server</.button>
-          </div>
+
+      <!-- Channels Sidebar -->
+      <div class="w-60 bg-gray-800 flex flex-col border-r border-gray-700">
+        <!-- Header -->
+        <div class="px-4 py-4 border-b border-gray-700">
+          <h2 class="font-bold text-lg truncate">
+            {if Map.get(@selected_server_user, :id), do: @selected_server_user.server.name, else: "Select a Server"}
+          </h2>
+        </div>
+
+        <!-- Create Channel Button -->
+        <div :if={Map.get(@selected_server_user, :id)} class="px-4 py-2">
+          <.button phx-click="show_channel_create_modal" class="w-full bg-indigo-600 hover:bg-indigo-700">
+            + Create Channel
+          </.button>
+        </div>
+
+        <!-- Upload Errors -->
+        <div :if={@uploads.message_uploads.errors != []} class="px-4 py-2 bg-red-900/30 border-l-4 border-red-600">
           <%= for {_ref, msg} <- @uploads.message_uploads.errors do %>
-            <h3><%= Phoenix.Naming.humanize(msg) %></h3>
+            <p class="text-red-400 text-sm"><%= Phoenix.Naming.humanize(msg) %></p>
           <% end %>
-          <%= for entry <- @uploads.message_uploads.entries do %>
-            <.live_img_preview entry={entry} width="75" />
-            <div class="py-5"><%= entry.progress %>%</div>
-          <% end %>
+        </div>
 
-          <div id="server_list">
-            <div :for={server_user <- @server_users}>
-              <div phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={@selected_server_user && server_user.id == @selected_server_user.id && "selected"} phx-hook="contextMenu" id={"select_server_#{server_user.server.id}"} data-context_menu_id={"server_context_#{server_user.server.id}"}>
-                {server_user.server.name}
-              </div>
-              <div
-                  id={"server_context_#{server_user.server.id}"}
-                  class="context_menu hidden"
-                >
-                <.button
-                  data-confirm="This action <b>cannot</b> be undone."
-                  data-confirm-title={"Delete server \"#{server_user.server.name}\"?"}
-                  data-confirm-button="Delete Server"
-                  data-confirm-variant="danger"
-                  data-confirm-icon="hero-exclamation-triangle"
-                  phx-click="delete_server"
-                  phx-value-server_id={server_user.server.id}
-                  class="context_menu_item">Delete Server</.button>
-              </div>
+        <!-- Channels List -->
+        <div class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+          <div :for={channel <- @channels} class="relative group">
+            <div
+              phx-click="select_channel"
+              phx-value-channel-id={channel.id}
+              phx-hook="contextMenu"
+              id={"select_channel_#{channel.id}"}
+              data-context_menu_id={if @default_channel_id != channel.id, do: "channel_context_#{channel.id}", else: ""}
+              class={[
+                "px-3 py-2 rounded cursor-pointer transition-colors",
+                @selected_channel && channel.id == @selected_channel.id && "bg-gray-700 text-white",
+                !(@selected_channel && channel.id == @selected_channel.id) && "text-gray-400 hover:text-white hover:bg-gray-700/50"
+              ]}
+            >
+              # {channel.name}
+            </div>
+            <div
+              :if={@default_channel_id != channel.id}
+              id={"channel_context_#{channel.id}"}
+              class="context_menu hidden absolute left-full top-0 ml-2 bg-gray-800 rounded shadow-lg z-10 min-w-max"
+            >
+              <.button
+                data-confirm="This action <b>cannot</b> be undone."
+                data-confirm-title={"Delete channel \"#{channel.name}\"?"}
+                data-confirm-button="Delete Channel"
+                data-confirm-variant="danger"
+                data-confirm-icon="hero-exclamation-triangle"
+                phx-click="delete_channel"
+                phx-value-channel_id={channel.id}
+                class="context_menu_item w-full text-left px-4 py-2 hover:bg-gray-700 text-red-400"
+              >
+                Delete Channel
+              </.button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="flex flex-col w-80 h-full m-0 overflow-y-scroll">
-          <div :if={Map.get(@selected_server_user, :id)}>
-            <.button phx-click="show_channel_create_modal">Create Channel</.button>
-          </div>
-          <div class="flex-1">
-            <div :for={channel <- @channels}>
-              <div phx-click="select_channel" phx-value-channel-id={channel.id} class={[@selected_channel && channel.id == @selected_channel.id && "selected", "w-full"]} phx-hook="contextMenu" id={"select_channel_#{channel.id}"} data-context_menu_id={if @default_channel_id != channel.id, do: "channel_context_#{channel.id}", else: ""}>
-                # {channel.name}
-              </div>
-              <div
-                  :if={@default_channel_id != channel.id}
-                  id={"channel_context_#{channel.id}"}
-                  class="context_menu hidden"
-                >
-                <.button
-                  data-confirm="This action <b>cannot</b> be undone."
-                  data-confirm-title={"Delete channel \"#{channel.name}\"?"}
-                  data-confirm-button="Delete Channel"
-                  data-confirm-variant="danger"
-                  data-confirm-icon="hero-exclamation-triangle"
-                  phx-click="delete_channel"
-                  phx-value-channel_id={channel.id}
-                  class="context_menu_item">Delete Channel</.button>
-              </div>
-            </div>
-          </div>
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col">
+        <!-- Top Bar -->
+        <div class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h1 class="text-xl font-bold">
+            {if Map.get(@selected_channel, :id), do: "# #{@selected_channel.name}", else: "Select a channel"}
+          </h1>
+          <form phx-submit="search" class="flex">
+            <input
+              type="text"
+              name="query"
+              placeholder="Search..."
+              class="px-4 py-2 rounded-lg bg-gray-700 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </form>
         </div>
 
-        <div class="flex flex-col w-full h-full">
-          <div class="flex h-full w-full">
-          <%= for channel <- @channels do %>
-            <div class={["flex flex-1 flex-col w-full h-full channel_view overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
-              <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"messages_#{channel.id}"} phx-hook={"messageScroll"} data-channel_id={channel.id}>
-                <div :for={{dom_id, message} <- @streams["messages_#{channel.id}"]} id={dom_id} data-user={message.user_id} class="message" data-message_id={message.id}>
-                  <div class="font-semibold user">
-                    {message.user.username}
-                    <time phx-hook="updateTime" id={"message_#{message.id}"} datetime={DateTime.to_iso8601(message.inserted_at)}>
-                      <%= message.inserted_at %>
-                    </time>
-                  </div>
-                  <div class="w-full">
-                    {message.message}
-                  </div>
-                </div>
-              </div>
-              <div class="w-full" :if={@selected_channel && channel.id == @selected_channel.id}>
-                <.simple_form
-                  class="flex flex-row w-full m-0 p-0"
-                  for={@message_form}
-                  id={"server_create_form_#{channel.id}"}
-                  phx-submit="send_message"
-                  phx-change="validate_message"
-                  phx-value-channel-id={@selected_channel.id}
-                  no-margin={true}
+        <!-- Messages and Sidebar Container -->
+        <div class="flex-1 flex overflow-hidden">
+          <!-- Messages Area -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <div class={["flex flex-col h-full overflow-hidden"]} :if={!Map.get(@selected_channel, :id, false)}></div>
+            <%= for channel <- @channels do %>
+              <div class={["flex flex-col h-full overflow-hidden", (channel.id != Map.get(@selected_channel, :id) && "hidden")]}>
+                <div
+                  class="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+                  phx-update="stream"
+                  id={"messages_#{channel.id}"}
+                  phx-hook="messageScroll"
+                  data-channel_id={channel.id}
                 >
-                  <.live_file_input id={"upload_#{channel.id}"} upload={@uploads.message_uploads} />
+                  <div
+                    :for={{dom_id, message} <- @streams["messages_#{channel.id}"]}
+                    id={dom_id}
+                    data-user={message.user_id}
+                    data-message_id={message.id}
+                    class="group hover:bg-gray-700/30 px-4 py-2 rounded transition-colors message"
+                  >
+                    <div class="flex items-baseline gap-3">
+                      <span class="font-semibold text-indigo-400">{message.user.username}</span>
+                      <time
+                        phx-hook="updateTime"
+                        id={"message_#{message.id}"}
+                        datetime={DateTime.to_iso8601(message.inserted_at)}
+                        class="text-xs text-gray-500 group-hover:text-gray-400"
+                      >
+                        <%= message.inserted_at %>
+                      </time>
+                    </div>
+                    <p class="text-gray-200 mt-1">{message.message}</p>
+                  </div>
+                </div>
+              </div>
+            <% end %>
 
-                  <div class="flex-1 m-0 w-full">
-                    <!--<.input class="w-full p-0 m-0" field={@server_create_form[:name]} type="text" placeholder="Message" />-->
-                    <input type="text" name="message[message]" class="m-0 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400" placeholder="Message">
-                  </div>
-                  <div class="w-32 m-0 w-full">
-                    <.button class="w-32 m-0">Send Message</.button>
-                  </div>
-                </.simple_form>
-              </div>
+            <!-- Message Input -->
+            <div class="bg-gray-800 border-t border-gray-700 px-6 py-4" :if={Map.get(@selected_channel, :id, false)}>
+              <.simple_form
+                class="flex gap-4"
+                for={@message_form}
+                id={"server_create_form_#{@selected_channel.id}"}
+                phx-submit="send_message"
+                phx-change="validate_message"
+                phx-value-channel-id={@selected_channel.id}
+                no-margin={true}
+              >
+                <.live_file_input
+                  id={"upload_#{@selected_channel.id}"}
+                  upload={@uploads.message_uploads}
+                  class="hidden"
+                />
+                <div class="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    name="message[message]"
+                    class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Message ##{@selected_channel.name}"
+                  />
+                  <.button class="bg-indigo-600 hover:bg-indigo-700">Send</.button>
+                </div>
+              </.simple_form>
             </div>
-          <% end %>
-            <div class={["flex flex-1 flex-col w-full h-full channel_view overflow-hidden", (Map.get(@selected_channel, :id) && "hidden")]}></div>
-            <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
-              Search
-              <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
-                <div :for={{dom_id, message} <- @streams[:search_results]} id={dom_id} data-channel_id={message.channel_id} class="search_result" data-message_id={message.id} phx-click="select_search_message" phx-value-message_id={message.id}>
-                  <div class="font-semibold channel_name">
-                    {message.channel.name}
-                  </div>
-                  <div class="w-full">
-                    <span class="user">{message.user.username}</span>
-                    <br/>{message.message}
-                  </div>
+          </div>
+
+
+
+          <!-- Right Sidebar - Search or Users -->
+          <div class={["w-64 bg-gray-800 border-l border-gray-700 flex flex-col overflow-hidden", (@sidebar_action == :search || " hidden")]}>
+            <div class="px-6 py-4 border-b border-gray-700 font-semibold">Search Results</div>
+            <div
+              class="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+              phx-update="stream"
+              id="search_results"
+              phx-hook="searchHistoryScroll"
+            >
+              <div
+                :for={{dom_id, message} <- @streams[:search_results]}
+                id={dom_id}
+                data-channel_id={message.channel_id}
+                data-message_id={message.id}
+                phx-click="select_search_message"
+                phx-value-message_id={message.id}
+                class="p-3 rounded cursor-pointer hover:bg-gray-700 transition-colors search_result"
+              >
+                <div class="text-xs text-gray-400 font-semibold">#{message.channel.name}</div>
+                <div class="text-sm mt-1">
+                  <span class="text-indigo-400">{message.user.username}</span>
+                  <p class="text-gray-300 mt-1">{message.message}</p>
                 </div>
               </div>
             </div>
-            <div class={["flex flex-col w-80 h-full m-0 overflow-y-scroll", (@sidebar_action == :users || " hidden")]}>
-              <span class="font-semibold">Users</span>
-              <div class="flex-1" phx-update="stream" id="users">
-                <div :for={{dom_id, presence} <- @streams.presences} id={dom_id} class="user_presence">
-                  <%= if presence.online do %>
-                  <div class="flex items-center space-x-2">
-                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span class="text-gray-500 text-sm">{presence.id}</span>
-                  </div>
-                  <% else %>
-                  <div class="flex items-center space-x-2">
-                    <span class="w-3 h-3 rounded-full bg-gray-500"></span>
-                    <span class="text-gray-500 text-sm">{presence.id}</span>
-                  </div>
-                  <% end %>
-                </div>
+          </div>
+
+          <!-- Right Sidebar - Users -->
+          <div class={["w-64 bg-gray-800 border-l border-gray-700 flex flex-col overflow-hidden", (@sidebar_action == :users || " hidden")]}>
+            <div class="px-6 py-4 border-b border-gray-700 font-semibold">Members</div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 space-y-2" phx-update="stream" id="users">
+              <div :for={{dom_id, presence} <- @streams.presences} id={dom_id} class="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-700 transition-colors">
+                <span class={["w-2 h-2 rounded-full", presence.online && "bg-green-500", !presence.online && "bg-gray-600"]}></span>
+                <span class="text-sm">{presence.id}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Modals -->
     <div>
       <.raw_modal :if={@modal_action == "server_create_modal"} id="server-create-modal" hide_event="hide_modals">
         <:header>Create New Server</:header>
@@ -239,7 +320,7 @@ defmodule ChatServerWeb.ChatLive.Index do
       </.raw_modal>
 
       <.raw_modal :if={@modal_action == "find_server_modal"} id="find-server-modal" hide_event="hide_modals">
-        <.live_component module={FindServerModalComponent} id="find_server_form" modal_id="find-server-modal" current_user={@current_user} server_users={@server_users}/>
+        <.live_component module={FindServerModalComponent} id="find_server_form" modal_id="find-server-modal" current_user={@current_user} server_users={@server_users} />
       </.raw_modal>
     </div>
     """
@@ -369,7 +450,7 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def previous_search_page(socket, last_message_id) do
-    previous_search_page_messages = Servers.list_previous_search_messages(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
+    previous_search_page_messages = Servers.search_messages_previous(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
 
     if(previous_search_page_messages != []) do
       Enum.reduce(previous_search_page_messages, socket, fn message, acc_socket ->
@@ -520,7 +601,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:default_channel_id, Map.get(default_channel, :id, nil))
 
     socket = Enum.reduce(channels, socket, fn channel, acc_socket ->
-      stream(acc_socket, "messages_#{channel.id}", (if selected_channel.id == channel_id, do: messages, else: Map.get(latest_channel_messages, channel.id)), reset: true)
+      stream(acc_socket, "messages_#{channel.id}", (if selected_channel.id == channel.id && messages != nil, do: messages, else: Map.get(latest_channel_messages, channel.id)), reset: true)
     end)
 
     if connected?(socket) do
@@ -570,8 +651,6 @@ defmodule ChatServerWeb.ChatLive.Index do
   def handle_event("select_search_message", %{"message_id" => message_id}, socket) do
     message = Servers.get_message!(message_id, [:channel, :user])
     server_user = Servers.get_server_user_by_server_and_user!(message.channel.server_id, socket.assigns.current_user.id)
-
-    IO.inspect(Servers.list_channel_messages_from_message_id(message_id, socket.assigns.message_page_size), label: "MESSAGES1000")
 
     socket = socket
     |> select_server_user(server_user.id, channel_id: message.channel.id, messages: Servers.list_channel_messages_from_message_id(message_id, socket.assigns.message_page_size))
