@@ -80,7 +80,7 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
       socket = socket
       |> assign(:form, to_form(changeset))
 
-      Servers.server_list_broadcast(socket.assigns.current_user.id, {:servers_updated})
+      Servers.server_list_broadcast(socket.assigns.current_user.id, :servers_updated)
 
       send(self(), "hide_modals")
 

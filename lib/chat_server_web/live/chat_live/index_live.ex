@@ -42,7 +42,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:message_form, to_form(Servers.change_message(%Message{})))
     |> assign(:selected_server_user, %ServerUser{})
     |> assign(:selected_channel, %Channel{})
-    |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
+    |> assign(:server_users, Servers.list_user_server_users(socket.assigns.current_user.id))
     |> assign(:channels, [])
     |> assign(:channel_page_data, %{})
     |> assign(:last_viewport_event, System.monotonic_time())
@@ -101,9 +101,23 @@ defmodule ChatServerWeb.ChatLive.Index do
 
           <div id="server_list">
             <div :for={server_user <- @server_users}>
-              <button phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={@selected_server_user && server_user.id == @selected_server_user.id && "selected"}>
+              <div phx-click="select_server_user" phx-value-server-user-id={server_user.id} class={@selected_server_user && server_user.id == @selected_server_user.id && "selected"} phx-hook="contextMenu" id={"select_server_#{server_user.server.id}"} data-context_menu_id={"server_context_#{server_user.server.id}"}>
                 {server_user.server.name}
-              </button>
+              </div>
+              <div
+                  id={"server_context_#{server_user.server.id}"}
+                  class="context_menu hidden"
+                >
+                <.button
+                  data-confirm="This action <b>cannot</b> be undone."
+                  data-confirm-title={"Delete server \"#{server_user.server.name}\"?"}
+                  data-confirm-button="Delete Server"
+                  data-confirm-variant="danger"
+                  data-confirm-icon="hero-exclamation-triangle"
+                  phx-click="delete_server"
+                  phx-value-server_id={server_user.server.id}
+                  class="context_menu_item">Delete Server</.button>
+              </div>
             </div>
           </div>
         </div>
@@ -176,6 +190,7 @@ defmodule ChatServerWeb.ChatLive.Index do
               </div>
             </div>
           <% end %>
+            <div class={["flex flex-1 flex-col w-full h-full channel_view overflow-hidden", (Map.get(@selected_channel, :id) && "hidden")]}></div>
             <div class={["flex flex-col w-80 h-full m-0 overflow-y-auto", (@sidebar_action == :search || " hidden")]}>
               Search
               <div class="flex flex-1 flex-col w-full overflow-y-auto" phx-update="stream" id={"search_results"} phx-hook={"searchHistoryScroll"} >
@@ -396,8 +411,8 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   # Handle broadcasts of PubSub events for the server list
 
-  def handle_info({:servers_updated}, socket) do
-    {:noreply, assign(socket, :server_users, Servers.list_user_servers(socket.assigns.current_user.id))}
+  def handle_info(:servers_updated, socket) do
+    {:noreply, assign(socket, :server_users, Servers.list_user_server_users(socket.assigns.current_user.id))}
   end
 
   def handle_info({:channel_created, %Channel{} = channel}, socket) do
@@ -464,7 +479,7 @@ defmodule ChatServerWeb.ChatLive.Index do
     end
 
     selected_server_user = Servers.get_server_user!(server_user_id)
-    server_users = Servers.list_user_servers(socket.assigns.current_user.id)
+    server_users = Servers.list_user_server_users(socket.assigns.current_user.id)
     selected_channel = Servers.get_channel!(if channel_id != nil, do: channel_id, else: selected_server_user.last_selected_channel_id)
     channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
@@ -612,6 +627,40 @@ defmodule ChatServerWeb.ChatLive.Index do
     |> assign(:channels, Servers.list_server_user_channels(socket.assigns.selected_server_user.server_id))
     |> assign(:channel_page_data, Map.delete(socket.assigns.channel_page_data, channel_id))
     |> stream("messages_#{channel_id}", [], reset: true)
+
+    {:noreply, socket}
+  end
+
+
+
+  def handle_event("delete_server", %{"server_id" => server_id}, socket) do
+    server_id = String.to_integer(server_id)
+    users = Servers.list_users_belonging_to_server(server_id)
+
+    Servers.delete_server(server_id)
+
+    IO.inspect(socket.assigns.selected_server_user.server_id, label: "SELECTED SERVER USER SERVER ID")
+    IO.inspect(server_id, label: "SERVER ID")
+
+    socket = if socket.assigns.selected_server_user.server_id == server_id do
+      socket = Enum.reduce(socket.assigns.channels, socket, fn channel, acc_socket ->
+        Servers.chat_unsubscribe(channel.id)
+        stream(acc_socket, "messages_#{channel.id}", [], reset: true)
+      end)
+
+      socket
+      |> assign(:selected_server_user, %ServerUser{})
+      |> assign(:selected_channel, %Channel{})
+      |> assign(:channels, [])
+      |> assign(:channel_page_data, %{})
+      |> stream(:presences, [], reset: true)
+    else
+      socket
+    end
+
+    for user <- users do
+      Servers.server_list_broadcast(user.id, :servers_updated)
+    end
 
     {:noreply, socket}
   end

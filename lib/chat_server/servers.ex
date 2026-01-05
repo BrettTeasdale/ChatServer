@@ -232,6 +232,46 @@ defmodule ChatServer.Servers do
     |> Repo.update()
   end
 
+
+  @doc """
+  Deletes a server.
+
+  ## Examples
+
+      iex> delete_server(server)
+      {:ok, %Server{}}
+
+      iex> delete_server(server)
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def delete_server(server_id) when is_number(server_id) or is_binary(server_id) do
+    from(
+      m in Message,
+      join: c in Channel, on: c.id == m.channel_id,
+      where: c.server_id == ^server_id
+    )
+    |> Repo.delete_all()
+
+    from(
+      c in Channel,
+      where: c.server_id == ^server_id
+    )
+    |> Repo.delete_all()
+
+    from(
+      su in ServerUser,
+      where: su.server_id == ^server_id
+    )
+    |> Repo.delete_all()
+
+    from(
+      s in Server,
+      where: s.id == ^server_id
+    )
+    |> Repo.delete_all()
+  end
+
   @doc """
   Deletes a server.
 
@@ -266,11 +306,11 @@ defmodule ChatServer.Servers do
 
   ## Examples
 
-      iex> list_user_servers()
+      iex> list_user_server_users()
       [%ServerUser{}, ...]
 
   """
-  def list_user_servers(user_id) when is_number(user_id) do
+  def list_user_server_users(user_id) when is_number(user_id) do
     from(
       su in ServerUser,
       join: s in Server, on: s.id == su.server_id,
@@ -529,7 +569,8 @@ defmodule ChatServer.Servers do
   def get_server_user_by_server_and_user!(server_user_id, user_id) when (is_number(server_user_id) or is_binary(server_user_id)) and (is_number(user_id) or is_binary(user_id)) do
     from(
       su in ServerUser,
-      where: su.server_id == ^server_user_id and su.user_id == ^user_id
+      where: su.server_id == ^server_user_id and su.user_id == ^user_id,
+      preload: [:server]
     )
     |> Repo.one!()
   end
@@ -555,6 +596,7 @@ defmodule ChatServer.Servers do
     |> Repo.insert()
 
     server_user
+    |> Repo.preload(:server)
   end
 
   @doc """

@@ -96,12 +96,12 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     %{"server_id" => server_id} = params
 
     Servers.leave_server(socket.assigns.current_user.id, server_id)
-    Servers.server_list_broadcast(socket.assigns.current_user.id, {:servers_updated})
+    Servers.server_list_broadcast(socket.assigns.current_user.id, :servers_updated)
 
     server = Servers.get_server!(server_id)
 
     socket = socket
-    |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
+    |> assign(:server_users, Servers.list_user_server_users(socket.assigns.current_user.id))
 
     {:noreply, stream_insert(socket, :search_results, server)}
   end
@@ -111,12 +111,12 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     %{"server_id" => server_id} = params
 
     Servers.join_server(socket.assigns.current_user.id, server_id)
-    Servers.server_list_broadcast(socket.assigns.current_user.id, {:servers_updated})
+    Servers.server_list_broadcast(socket.assigns.current_user.id, :servers_updated)
 
     server = Servers.get_server!(server_id)
 
     socket = socket
-    |> assign(:server_users, Servers.list_user_servers(socket.assigns.current_user.id))
+    |> assign(:server_users, Servers.list_user_server_users(socket.assigns.current_user.id))
 
     {:noreply, stream_insert(socket, :search_results, server)}
   end
