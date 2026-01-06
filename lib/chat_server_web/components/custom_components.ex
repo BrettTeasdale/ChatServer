@@ -36,7 +36,7 @@ defmodule ChatServerWeb.CustomComponents do
       id={@id}
       class="relative z-50"
     >
-      <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
+      <div id={"#{@id}-bg"} class="bg-black/70 fixed inset-0 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
         aria-labelledby={"#{@id}-title"}
@@ -52,9 +52,9 @@ defmodule ChatServerWeb.CustomComponents do
               phx-window-keydown={JS.push(@hide_event)}
               phx-key="escape"
               phx-click-away={JS.push(@hide_event)}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
+              class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl p-14 bg-slate-800 shadow-2xl transition"
             >
-              <div :if={@header} class="flex shrink-0 items-center pb-4 text-xl font-medium text-slate-800">
+              <div :if={@header} class="flex shrink-0 items-center pb-4 text-xl font-medium border-b border-slate-700 text-base font-semibold text-white">
                 {render_slot(@header)}
               </div>
               {render_slot(@inner_block)}
@@ -103,7 +103,7 @@ defmodule ChatServerWeb.CustomComponents do
       class="relative z-50 hidden"
       {@rest}
     >
-      <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
+      <div id={"#{@id}-bg"} class="bg-black/70 fixed inset-0 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
         aria-labelledby={"#{@id}-title"}
@@ -119,19 +119,19 @@ defmodule ChatServerWeb.CustomComponents do
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
+              class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl p-14 bg-slate-800 shadow-2xl transition"
             >
-              <div class="absolute top-6 right-5">
+              <div class="absolute top-6 right-5 text-white">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="-m-3 flex-none p-3 opacity-20 hover:opacity-40"
+                  class="-m-3 flex-none p-3 opacity-60 hover:opacity-40"
                   aria-label="close"
                 >
                   <.icon name="hero-x-mark-solid" class="h-5 w-5" />
                 </button>
               </div>
-              <div id={"#{@id}-content"} class={["w-full", @class]}>
+              <div id={"#{@id}-content"} class={["w-full", "text-white", @class]}>
                 {render_slot(@inner_block)}
               </div>
             </.focus_wrap>

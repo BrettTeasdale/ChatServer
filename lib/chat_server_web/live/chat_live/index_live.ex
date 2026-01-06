@@ -121,10 +121,10 @@ defmodule ChatServerWeb.ChatLive.Index do
       <!-- Channels Sidebar -->
       <div class="w-60 bg-gray-800 flex flex-col border-r border-gray-700">
         <!-- Header -->
-        <div class="px-4 py-4 border-b border-gray-700">
-          <h2 class="font-bold text-lg truncate">
+        <div class="px-4 py-4 border-b border-gray-700 h-16 ">
+          <h1 class="font-bold text-lg truncate">
             {if Map.get(@selected_server_user, :id), do: @selected_server_user.server.name, else: "Select a Server"}
-          </h2>
+          </h1>
         </div>
 
         <!-- Create Channel Button -->
@@ -183,16 +183,16 @@ defmodule ChatServerWeb.ChatLive.Index do
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col">
         <!-- Top Bar -->
-        <div class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
-          <h1 class="text-xl font-bold">
+        <div class="bg-gray-800 h-16 border-b border-gray-700 pl-6 pr-4 py-2 flex items-center justify-between">
+          <h1 class="text-lg font-bold">
             {if Map.get(@selected_channel, :id), do: "# #{@selected_channel.name}", else: "Select a channel"}
           </h1>
-          <form phx-submit="search" class="flex">
+          <form phx-submit="search" class="flex m-0 p-0">
             <input
               type="text"
               name="query"
               placeholder="Search..."
-              class="px-4 py-2 rounded-lg bg-gray-700 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="px-4 py-2 my-0 rounded-lg bg-gray-700 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </form>
         </div>
@@ -226,7 +226,6 @@ defmodule ChatServerWeb.ChatLive.Index do
                         datetime={DateTime.to_iso8601(message.inserted_at)}
                         class="text-xs text-gray-500 group-hover:text-gray-400"
                       >
-                        <%= message.inserted_at %>
                       </time>
                     </div>
                     <p class="text-gray-200 mt-1">{message.message}</p>
@@ -287,6 +286,13 @@ defmodule ChatServerWeb.ChatLive.Index do
                 <div class="text-xs text-gray-400 font-semibold">#{message.channel.name}</div>
                 <div class="text-sm mt-1">
                   <span class="text-indigo-400">{message.user.username}</span>
+                  <time
+                    phx-hook="updateTime"
+                    id={"search_message_#{message.id}"}
+                    datetime={DateTime.to_iso8601(message.inserted_at)}
+                    class="text-xs text-gray-500 group-hover:text-gray-400"
+                  >
+                  </time>
                   <p class="text-gray-300 mt-1">{message.message}</p>
                 </div>
               </div>

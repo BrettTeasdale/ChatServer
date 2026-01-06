@@ -20,7 +20,7 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
 
             <.input field={@form[:name]} type="text" label="Channel Name" required />
 
-            <label class="block text-sm font-semibold leading-6 text-zinc-800">Attributes</label>
+            <label class="block text-sm font-semibold leading-6">Attributes</label>
 
             <.input field={@form[:needs_owner]} type="checkbox" label="Requires Owner" />
 
