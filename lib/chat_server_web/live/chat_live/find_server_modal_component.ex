@@ -28,7 +28,7 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
           </div>
         </.simple_form>
 
-        <div class="flex flex-col overflow-y-auto md:max-h-screen" phx-update="stream" id={"server_search_results"} phx-hook={"findServerScroll"} phx-target={@myself}>
+        <div class="flex flex-col overflow-y-auto max-h-[calc(100vh-250px)]" phx-update="stream" id={"server_search_results"} phx-hook={"findServerScroll"} phx-target={@myself}>
           <div :for={{dom_id, server} <- @streams[:search_results]} id={dom_id} data-server_id={server.id} class="search_result w-full">
             <div class="font-semibold">
               {server.name}
