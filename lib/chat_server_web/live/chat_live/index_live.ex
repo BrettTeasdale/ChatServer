@@ -3,36 +3,35 @@ defmodule ChatServerWeb.ChatLive.Index do
 
   import ChatServerWeb.CustomComponents
 
-  alias ChatServer.Servers.Server
-  alias ChatServer.Servers.ServerUser
+  alias ChatServer.Accounts
+
+  alias ChatServer.Servers
   alias ChatServer.Servers.Channel
   alias ChatServer.Servers.Message
+  alias ChatServer.Servers.Server
+  alias ChatServer.Servers.ServerUser
   alias ChatServer.Servers.Upload
-  alias ChatServer.Servers
-  alias ChatServer.Accounts
 
   alias ChatServerWeb.Presence
 
-  alias ChatServerWeb.ChatLive.ServerCreateModalComponent
   alias ChatServerWeb.ChatLive.ChannelCreateModalComponent
   alias ChatServerWeb.ChatLive.FindServerModalComponent
+  alias ChatServerWeb.ChatLive.ServerCreateModalComponent
 
   on_mount {ChatServerWeb.UserAuth, :ensure_authenticated}
 
-  defp presence_topic do
-    "chat_users"
-  end
+  @presence_topic "chat_users"
 
   def mount(_params, _session, socket) do
 
     if connected?(socket) do
       Servers.server_list_subscribe(socket.assigns.current_user.id)
 
-      {:ok, _} = Presence.track(self(), presence_topic(), socket.assigns.current_user.id, %{
+      {:ok, _} = Presence.track(self(), @presence_topic, socket.assigns.current_user.id, %{
         online_at: System.system_time(:second)
       })
 
-      Phoenix.PubSub.subscribe(ChatServer.PubSub, "updates:" <> presence_topic())
+      Phoenix.PubSub.subscribe(ChatServer.PubSub, "updates:" <> @presence_topic)
     end
 
     socket = socket
@@ -299,7 +298,7 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     users_belonging_to_server = Servers.list_users_belonging_to_server(selected_server_user.server_id)
     presences = for user <- users_belonging_to_server do
-      case Presence.get_by_key(presence_topic(), user.id) do
+      case Presence.get_by_key(@presence_topic, user.id) do
         nil ->
           %{id: user.username, online: false}
         presence ->
