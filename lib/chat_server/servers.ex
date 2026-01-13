@@ -148,7 +148,7 @@ defmodule ChatServer.Servers do
     single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
     |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
     |> where([_s, rn], rn.id == ^last_server_id)
-    |> select([s,rn], %{id: rn.id, row_number: rn.row_number})
+    |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
 
     query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
     |> with_cte("single_row_number", as: ^single_row_number)
@@ -182,7 +182,7 @@ defmodule ChatServer.Servers do
     single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
     |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
     |> where([_s, rn], rn.id == ^last_server_id)
-    |> select([s,rn], %{id: rn.id, row_number: rn.row_number})
+    |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
 
     query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
     |> with_cte("single_row_number", as: ^single_row_number)

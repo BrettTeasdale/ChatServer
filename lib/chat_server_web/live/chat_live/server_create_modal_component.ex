@@ -3,8 +3,8 @@ defmodule ChatServerWeb.ChatLive.ServerCreateModalComponent do
 
   import ChatServerWeb.CustomComponents
 
-  alias ChatServer.Servers;
-  alias ChatServer.Servers.Server;
+  alias ChatServer.Servers
+  alias ChatServer.Servers.Server
 
   def render(assigns) do
     ~H"""

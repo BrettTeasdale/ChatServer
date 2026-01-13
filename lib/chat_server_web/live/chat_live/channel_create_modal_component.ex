@@ -1,8 +1,8 @@
 defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
   use ChatServerWeb, :live_component
 
-  alias ChatServer.Servers;
-  alias ChatServer.Servers.Channel;
+  alias ChatServer.Servers
+  alias ChatServer.Servers.Channel
 
   def render(assigns) do
     ~H"""
@@ -84,8 +84,6 @@ defmodule ChatServerWeb.ChatLive.ChannelCreateModalComponent do
 
         socket = socket
         |> assign(:form, to_form(changeset))
-
-        IO.inspect(channel)
 
         Servers.channel_list_broadcast(socket.assigns.current_user.id, selected_server_user.server_id, {:channel_created, channel})
 

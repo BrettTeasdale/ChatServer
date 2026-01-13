@@ -1,8 +1,8 @@
 defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
   use ChatServerWeb, :live_component
 
-  alias ChatServer.Servers;
-  alias ChatServer.Servers.Server;
+  alias ChatServer.Servers
+  alias ChatServer.Servers.Server
 
   def render(assigns) do
     ~H"""
@@ -137,7 +137,7 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     last_server_id = String.to_integer(last_server_id)
     previous_page_servers = Servers.search_servers_previous(socket.assigns.query, last_server_id, socket.assigns.page_size)
 
-    if(previous_page_servers != []) do
+    if previous_page_servers != [] do
       Enum.reduce(previous_page_servers, socket, fn server, acc_socket ->
         stream_insert(acc_socket, :search_results, server, at: 0, limit: 2 * socket.assigns.page_size)
       end)
@@ -150,7 +150,6 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
   def handle_event("next-page", %{"last_server_id" => last_server_id}, socket) do
     case socket.assigns.last_viewport_event + 500_000_000 < System.monotonic_time do
      true ->
-        IO.inspect("next page")
         {:noreply, next_page(socket, {:next_page, last_server_id})}
       _ ->
         {:noreply, socket}
@@ -161,7 +160,7 @@ defmodule ChatServerWeb.ChatLive.FindServerModalComponent do
     last_server_id = String.to_integer(last_server_id)
     next_page_servers = Servers.search_servers_next(socket.assigns.query, last_server_id, socket.assigns.page_size)
 
-    if(next_page_servers != []) do
+    if next_page_servers != [] do
       Enum.reduce(next_page_servers, socket, fn server, acc_socket ->
         stream_insert(acc_socket, :search_results, server, at: -1, limit: -2 * socket.assigns.page_size)
       end)

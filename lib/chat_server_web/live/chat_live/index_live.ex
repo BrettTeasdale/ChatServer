@@ -97,15 +97,12 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def handle_event("prev-page", %{"channel_id" => channel_id, "last_message_id" => last_message_id}, socket) do
-    IO.inspect(channel_id, label: "CHANNEL ID")
     case socket.assigns.last_viewport_event + 500_000_000 < System.monotonic_time do
      true ->
-        IO.inspect("NOT THROTTLED")
         socket = socket
         |> previous_page({:previous_page, channel_id, last_message_id})
         {:noreply, socket}
       _ ->
-        IO.inspect("THROTTLED")
         {:noreply, socket}
     end
   end
@@ -122,7 +119,6 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     if(previous_page_messages != []) do
       Enum.reduce(previous_page_messages, socket, fn message, acc_socket ->
-        IO.inspect(message, label: "MESSAGE")
         stream_insert(acc_socket, "messages_#{channel_id}", message, at: 0, limit: 2 * socket.assigns.message_page_size)
       end)
       |> assign(:last_viewport_event, System.monotonic_time())
@@ -134,10 +130,8 @@ defmodule ChatServerWeb.ChatLive.Index do
   def handle_event("next-page", %{"channel_id" => channel_id, "last_message_id" => last_message_id}, socket) do
     case socket.assigns.last_viewport_event + 500_000_000 < System.monotonic_time do
      true ->
-        IO.inspect("NOT THROTTLED")
         {:noreply, next_page(socket, {:next_page, channel_id, last_message_id})}
       _ ->
-        IO.inspect("THROTTLED")
         {:noreply, socket}
     end
   end
@@ -145,8 +139,6 @@ defmodule ChatServerWeb.ChatLive.Index do
   def next_page(socket, {:next_page, channel_id, last_message_id}) when is_binary(channel_id) and is_binary(last_message_id) do
     channel_id = String.to_integer(channel_id)
     last_message_id = String.to_integer(last_message_id)
-
-    IO.inspect(last_message_id, label: "LAST MESSAGE ID")
 
     next_page(socket, {:next_page, channel_id, last_message_id})
   end
@@ -156,7 +148,6 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     if(next_page_messages != []) do
       Enum.reduce(next_page_messages, socket, fn message, acc_socket ->
-        IO.inspect(message, label: "MESSAGE")
         stream_insert(acc_socket, "messages_#{channel_id}", message, at: -1, limit: -2 * socket.assigns.message_page_size)
       end)
       |> assign(:last_viewport_event, System.monotonic_time())
@@ -168,7 +159,6 @@ defmodule ChatServerWeb.ChatLive.Index do
   # Search history
 
   def handle_event("search-prev-page", %{"last_message_id" => last_message_id}, socket) do
-    IO.inspect("search-prev-page")
     case socket.assigns.last_search_viewport_event + 500_000_000 < System.monotonic_time do
      true ->
         {:noreply, previous_search_page(socket, last_message_id)}
@@ -208,11 +198,9 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def next_search_page(socket, last_message_id) do
-    IO.inspect("search-next-page")
     next_search_page_messages = Servers.search_messages_next(socket.assigns.search_query, last_message_id, socket.assigns.search_page_size)
 
     if(next_search_page_messages != []) do
-      IO.inspect("search-next-page 2")
       Enum.reduce(next_search_page_messages, socket, fn message, acc_socket ->
         stream_insert(acc_socket, :search_results, message, at: 0, limit: 2 * socket.assigns.search_page_size)
       end)
@@ -246,15 +234,13 @@ defmodule ChatServerWeb.ChatLive.Index do
     ## current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
 
     socket = if !Map.get(bottom_message, :id) || (Map.get(bottom_message, :id, 0) == Map.get(Map.get(Map.get(socket.assigns.channel_page_data, message.channel_id), :bottom_message), :id)) do
-      IO.inspect(socket.assigns.channel_page_data, label: "CHANNEL PAGE DATA")
-
       new_channel_page_data_entry = Map.get(socket.assigns.channel_page_data, message.channel.id, %{})
       |> Map.put(:bottom_message, message)
 
-      new_channel_page_data_entry = if !Map.get(new_channel_page_data_entry, :top_message) do
-        Map.put(new_channel_page_data_entry, :top_message, message)
-      else
+      new_channel_page_data_entry = if Map.get(new_channel_page_data_entry, :top_message) do
         new_channel_page_data_entry
+      else
+        Map.put(new_channel_page_data_entry, :top_message, message)
       end
 
       socket
@@ -297,29 +283,13 @@ defmodule ChatServerWeb.ChatLive.Index do
     channels = Servers.list_server_user_channels(selected_server_user.server_id)
 
     users_belonging_to_server = Servers.list_users_belonging_to_server(selected_server_user.server_id)
-    presences = for user <- users_belonging_to_server do
-      case Presence.get_by_key(@presence_topic, user.id) do
-        nil ->
-          %{id: user.username, online: false}
-        presence ->
-          %{id: user.username, online: true}
-      end
-    end
+    presences = get_channel_users_presences(users_belonging_to_server)
 
     socket = stream(socket, :presences, presences, reset: true)
 
-    latest_channel_messages = for channel <- channels, into: %{} do
-      {channel.id, Servers.list_latest_channel_messages(channel.id, socket.assigns.message_page_size)}
-    end
+    latest_channel_messages = get_latest_channel_messages(channels, socket.assigns.message_page_size)
 
-    channel_page_data = for channel <- channels, into: %{} do
-        bottom_message = Map.get(latest_channel_messages, channel.id) |> List.last(%Message{})
-
-        {channel.id, %{
-          top_message: Servers.get_channel_first_message(channel.id) || %Message{},
-          bottom_message: bottom_message,
-        }}
-    end
+    channel_page_data = get_channel_page_data(channels, latest_channel_messages)
 
     default_channel = Enum.find(channels, fn channel -> channel.is_default end)
 
@@ -343,6 +313,34 @@ defmodule ChatServerWeb.ChatLive.Index do
     end
 
     socket
+  end
+
+  defp get_latest_channel_messages(channels, page_size) do
+    for channel <- channels, into: %{} do
+      {channel.id, Servers.list_latest_channel_messages(channel.id, page_size)}
+    end
+  end
+
+  defp get_channel_users_presences(users) do
+    for user <- users do
+      case Presence.get_by_key(@presence_topic, user.id) do
+        nil ->
+          %{id: user.username, online: false}
+        presence ->
+          %{id: user.username, online: true}
+      end
+    end
+  end
+
+  defp get_channel_page_data(channels, latest_channel_messages) do
+    for channel <- channels, into: %{} do
+        bottom_message = Map.get(latest_channel_messages, channel.id) |> List.last(%Message{})
+
+        {channel.id, %{
+          top_message: Servers.get_channel_first_message(channel.id) || %Message{},
+          bottom_message: bottom_message,
+        }}
+    end
   end
 
   # Handle select server event
@@ -410,8 +408,6 @@ defmodule ChatServerWeb.ChatLive.Index do
         id: user.username
       }
 
-      IO.inspect(presence.metas, label: "LEFT METAS")
-
       if presence.metas == [] do
         {:noreply, stream_insert(socket, :presences, Map.put(new_presence, :online, false))}
       else
@@ -449,9 +445,6 @@ defmodule ChatServerWeb.ChatLive.Index do
     users = Servers.list_users_belonging_to_server(server_id)
 
     Servers.delete_server(server_id)
-
-    IO.inspect(socket.assigns.selected_server_user.server_id, label: "SELECTED SERVER USER SERVER ID")
-    IO.inspect(server_id, label: "SERVER ID")
 
     socket = if socket.assigns.selected_server_user.server_id == server_id do
       socket = Enum.reduce(socket.assigns.channels, socket, fn channel, acc_socket ->
