@@ -3,11 +3,11 @@ services:
     image: postgres-pgtextsearch
     restart: always
     environment:
-      POSTGRES_USER: chat_server
-      POSTGRES_PASSWORD: eWFwdDGJMpDm2NYVJuxjpkcDK50NAgu6EAv
-      POSTGRES_DB: chat_server
+      POSTGRES_USER: ${DOCKER_POSTGRESQL_USERNAME}
+      POSTGRES_PASSWORD: ${DOCKER_POSTGRESQL_PASSWORD}
+      POSTGRES_DB: ${DOCKER_POSTGRESQL_DATABASE}
     ports:
-      - "5532:5432"
+      - "${DOCKER_POSTGRESQL_PORT}:5432"
     volumes:
       - ./pgdata/:/var/lib/postgresql/
 

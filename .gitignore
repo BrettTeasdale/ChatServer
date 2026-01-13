@@ -35,4 +35,10 @@ chat_server-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Ignore our phoenix development server secret file
+/config/dev.secret.exs
+
+# Ignore .env files
+/.env
+
 /pgdata/

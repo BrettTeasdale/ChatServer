@@ -255,7 +255,7 @@ defmodule ChatServerWeb.ChatLive.Index do
                     type="text"
                     name="message[message]"
                     class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Message ##{@selected_channel.name}"
+                    placeholder={"Message ##{@selected_channel.name}"}
                   />
                   <.button class="bg-indigo-600 hover:bg-indigo-700">Send</.button>
                 </div>
