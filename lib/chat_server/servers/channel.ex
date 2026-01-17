@@ -18,7 +18,15 @@ defmodule ChatServer.Servers.Channel do
   @doc false
   def changeset(channel, attrs) do
     channel
-    |> cast(attrs, [:name, :server_id, :description, :needs_owner, :needs_operator, :needs_voiced, :is_default])
+    |> cast(attrs, [
+      :name,
+      :server_id,
+      :description,
+      :needs_owner,
+      :needs_operator,
+      :needs_voiced,
+      :is_default
+    ])
     |> validate_required([:name, :description])
   end
 end

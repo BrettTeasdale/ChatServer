@@ -23,10 +23,11 @@ defmodule ChatServerWeb.Presence do
     end
 
     for {user_id, %{metas: metas}} <- leaves do
-      metas = case Map.fetch(presences, user_id) do
-        {:ok, presence_metas} -> presence_metas
-        :error -> []
-      end
+      metas =
+        case Map.fetch(presences, user_id) do
+          {:ok, presence_metas} -> presence_metas
+          :error -> []
+        end
 
       presence = %{id: user_id, metas: metas}
 

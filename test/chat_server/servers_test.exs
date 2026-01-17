@@ -35,7 +35,12 @@ defmodule ChatServer.ServersTest do
 
     test "update_server/2 with valid data updates the server" do
       server = server_fixture()
-      update_attrs = %{name: "some updated name", private: false, description: "some updated description"}
+
+      update_attrs = %{
+        name: "some updated name",
+        private: false,
+        description: "some updated description"
+      }
 
       assert {:ok, %Server{} = server} = Servers.update_server(server, update_attrs)
       assert server.name == "some updated name"

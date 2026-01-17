@@ -55,15 +55,14 @@ defmodule ChatServerWeb.Router do
     end
   end
 
-
   # Chat Routes
 
   scope "/chat", ChatServerWeb do
     pipe_through [:chat, :require_authenticated_user]
 
     live_session :require_authenticated_user_chat,
-      layout: {ChatServerWeb.Layouts,
-      :chat_app}, on_mount: [{ChatServerWeb.UserAuth, :ensure_authenticated}] do
+      layout: {ChatServerWeb.Layouts, :chat_app},
+      on_mount: [{ChatServerWeb.UserAuth, :ensure_authenticated}] do
       live "/", ChatLive.Index
     end
   end
