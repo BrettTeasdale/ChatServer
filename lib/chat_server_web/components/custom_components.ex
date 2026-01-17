@@ -7,7 +7,7 @@ defmodule ChatServerWeb.CustomComponents do
 
   alias Phoenix.LiveView.JS
 
-@doc """
+  @doc """
   Renders a modal.
 
   ## Examples
@@ -30,12 +30,10 @@ defmodule ChatServerWeb.CustomComponents do
   attr :on_cancel, JS, default: %JS{}
   slot :header, required: false
   slot :inner_block, required: true
+
   def raw_modal(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class="relative z-50"
-    >
+    <div id={@id} class="relative z-50">
       <div id={"#{@id}-bg"} class="bg-black/70 fixed inset-0 transition-opacity" aria-hidden="true" />
       <div
         class="fixed inset-0 overflow-y-auto"
@@ -54,7 +52,10 @@ defmodule ChatServerWeb.CustomComponents do
               phx-click-away={JS.push(@hide_event)}
               class="shadow-zinc-700/10 ring-zinc-700/10 relative rounded-2xl p-14 bg-slate-800 shadow-2xl transition"
             >
-              <div :if={@header} class="flex shrink-0 items-center pb-4 text-xl font-medium border-b border-slate-700 text-base font-semibold text-white">
+              <div
+                :if={@header}
+                class="flex shrink-0 items-center pb-4 text-xl font-medium border-b border-slate-700 text-base font-semibold text-white"
+              >
                 {render_slot(@header)}
               </div>
               {render_slot(@inner_block)}
@@ -65,7 +66,6 @@ defmodule ChatServerWeb.CustomComponents do
     </div>
     """
   end
-
 
   @doc """
   Renders a modal.
@@ -142,7 +142,6 @@ defmodule ChatServerWeb.CustomComponents do
     """
   end
 
-
   @doc """
   Renders a button.
 
@@ -176,7 +175,6 @@ defmodule ChatServerWeb.CustomComponents do
     </button>
     """
   end
-
 
   @doc """
   Renders a [Heroicon](https://heroicons.com).

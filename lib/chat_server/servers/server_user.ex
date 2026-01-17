@@ -14,7 +14,6 @@ defmodule ChatServer.Servers.ServerUser do
     timestamps()
   end
 
-
   @doc false
   def changeset(server_user, attrs) do
     server_user

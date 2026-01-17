@@ -16,6 +16,7 @@ defmodule ChatServer.Repo.Migrations.EnableFulltextSearchCreateServerBm25Indexes
     flush()
 
     execute "CREATE INDEX servers_full_text_search_bm25 ON servers USING bm25(full_text_search) WITH (text_config='simple')"
+
     execute "CREATE INDEX messages_full_text_search_bm25 ON server_channel_messages USING bm25(message) WITH (text_config='simple')"
 
     flush()
