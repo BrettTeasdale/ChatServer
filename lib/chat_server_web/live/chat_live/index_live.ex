@@ -81,20 +81,16 @@ defmodule ChatServerWeb.ChatLive.Index do
       ) do
     %{current_user: user} = socket.assigns
 
-    # message_params = Map.put(message_params, "channel_id", channel_id)
-    # |> Map.put(message_params, "user_id", user.id)
-
     case Servers.create_message(user.id, channel_id, message_params) do
       {:ok, message} ->
         changeset = Servers.change_message(%Message{})
-
-        socket =
-          socket
-          |> assign(:message_form, to_form(changeset))
+        |> Map.put(:action, :validate)
 
         Servers.chat_broadcast(channel_id, {:message_created, message})
 
-        {:noreply, socket}
+        IO.inspect(changeset, label: "Changeset after message created")
+
+        {:noreply,  assign(socket, :message_form, to_form(changeset))}
 
       {:error, changeset} ->
         socket =

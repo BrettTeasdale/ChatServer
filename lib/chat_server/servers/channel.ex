@@ -27,6 +27,6 @@ defmodule ChatServer.Servers.Channel do
       :needs_voiced,
       :is_default
     ])
-    |> validate_required([:name, :description])
+    |> validate_required([:name, :description, :server_id])
   end
 end

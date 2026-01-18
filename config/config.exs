@@ -7,6 +7,16 @@
 # General application configuration
 import Config
 
+config :chat_server, ChatServer.Repo,
+  username: "chat_server",
+  password: "eWFwdDGJMpDm2NJJJYVJuxjpkcDK50NAgu6EAv",
+  hostname: "localhost",
+  database: "chat_server",
+  port: 5532,
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+
 config :chat_server,
   ecto_repos: [ChatServer.Repo],
   generators: [timestamp_type: :utc_datetime]

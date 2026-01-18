@@ -1,5 +1,7 @@
 import Config
 
+alias Dotenvy
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
@@ -18,6 +20,20 @@ import Config
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
   config :chat_server, ChatServerWeb.Endpoint, server: true
+end
+
+if config_env() == :dev do
+  Dotenvy.source!(".env")
+
+  config :chat_server, ChatServer.Repo,
+    username: Dotenvy.env!("POSTGRESQL_USERNAME", :string),
+    password: Dotenvy.env!("POSTGRESQL_PASSWORD", :string),
+    hostname: Dotenvy.env!("POSTGRESQL_HOSTNAME", :string),
+    database: Dotenvy.env!("POSTGRESQL_DATABASE", :string),
+    port: Dotenvy.env!("POSTGRESQL_PORT", :integer),
+    stacktrace: true,
+    show_sensitive_data_on_connection_error: true,
+    pool_size: 10
 end
 
 if config_env() == :prod do

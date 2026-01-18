@@ -271,6 +271,46 @@ defmodule ChatServer.Servers do
   end
 
   @doc """
+  Creates a server that belongs to a user
+
+  Returns Server user if successful.
+  """
+  def create_server(user_id, %{} = attrs) when is_number(user_id) or is_binary(user_id) do
+    Repo.transaction(fn ->
+      {:ok, server} = %Server{}
+      |> Server.changeset(attrs)
+      |> Repo.insert()
+
+      {:ok, server_user} = %ServerUser{}
+      |> ServerUser.changeset(%{
+        user_id: user_id,
+        server_id: server.id
+      })
+      |> Repo.insert()
+
+      {:ok, default_channel} = Channel.changeset(%Channel{}, %{
+        name: "General",
+        private: false,
+        is_default: true,
+        description: "A channel for general discussions.",
+        server_id: server_user.server_id
+      })
+      |> Repo.insert()
+
+      {:ok, server_user} = ServerUser.changeset(server_user, %{
+        last_selected_channel_id: default_channel.id,
+      })
+      |> Repo.update()
+
+      server_user = server_user
+      |> Repo.preload(:user)
+      |> Repo.preload(:server)
+
+      server_user
+    end)
+  end
+
+  @doc """
   Creates a server.
 
   ## Examples
@@ -868,16 +908,16 @@ defmodule ChatServer.Servers do
       Map.put(attrs, "channel_id", channel_id)
       |> Map.put("user_id", user_id)
 
-    {:ok, message} =
-      %Message{}
+    result = %Message{}
       |> Message.changeset(attrs)
       |> Repo.insert()
 
-    message =
-      message
-      |> Repo.preload([:user, :channel])
-
-    {:ok, message}
+    case result do
+      {:ok, message} ->
+        {:ok, Repo.preload(message, [:user, :channel])}
+      {:error, changeset} ->
+        {:error, changeset}
+    end
   end
 
   @doc """
