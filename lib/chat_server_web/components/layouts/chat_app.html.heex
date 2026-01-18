@@ -1,21 +1,30 @@
 <main class="w-screen h-screen p-0 m-0">
-<!--<main class="px-4 py-20 sm:px-6 lg:px-8">-->
+  <!--<main class="px-4 py-20 sm:px-6 lg:px-8">-->
   <!--<div class="mx-auto max-w-2xl">-->
-    <.flash_group flash={@flash} />
-    {@inner_content}
+  <.flash_group flash={@flash} />
+  {@inner_content}
   <!--</div>-->
 
   <!-- Data Confirm Modal -->
-  <.data_confirm_modal id="data-confirm-modal" phx-update="ignore" on_cancel={JS.dispatch("data-confirm:cancel")} show={}>
+  <.data_confirm_modal
+    id="data-confirm-modal"
+    phx-update="ignore"
+    on_cancel={JS.dispatch("data-confirm:cancel")}
+    show={false}
+  >
     <div class="space-y-2 text-center">
       <h2 class="text-lg font-bold mx-auto">
-      <.data_confirm_icon id="data-confirm-icon" data-class="size-10 hidden" name="hero-ignoreme" />
-      <span id="data-confirm-title"></span>
+        <.data_confirm_icon
+          id="data-confirm-icon"
+          data-class="size-10 hidden"
+          name="hero-ignoreme"
+        />
+        <span id="data-confirm-title"></span>
       </h2>
     </div>
 
     <p id="data-confirm-message" class="mt-4"></p>
-    
+
     <div class="flex gap-2 mt-4">
       <.data_confirm_button
         :for={variant <- ~w(primary danger)}
@@ -25,7 +34,9 @@
         class="grow"
       >
       </.data_confirm_button>
-      <.data_confirm_button variant="outline" phx-click={JS.dispatch("data-confirm:cancel")}>Cancel</.data_confirm_button>
+      <.data_confirm_button variant="outline" phx-click={JS.dispatch("data-confirm:cancel")}>
+        Cancel
+      </.data_confirm_button>
     </div>
   </.data_confirm_modal>
 </main>

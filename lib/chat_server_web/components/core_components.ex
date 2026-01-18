@@ -192,7 +192,8 @@ defmodule ChatServerWeb.CoreComponents do
   attr :for, :any, required: true, doc: "the data structure for the form"
   attr :as, :any, default: nil, doc: "the server side parameter to collect all input under"
 
-  attr :no_margin, :boolean, default: false,
+  attr :no_margin, :boolean,
+    default: false,
     doc: "whether to disable the default top margin on the form container"
 
   attr :rest, :global,

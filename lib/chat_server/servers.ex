@@ -26,7 +26,6 @@ defmodule ChatServer.Servers do
     Phoenix.PubSub.broadcast(ChatServer.PubSub, server_list_topic(user_id), message)
   end
 
-
   def channel_list_topic(user_id, server_id) do
     "channel_list:#{user_id}:#{server_id}"
   end
@@ -42,7 +41,6 @@ defmodule ChatServer.Servers do
   def channel_list_broadcast(user_id, server_id, message) do
     Phoenix.PubSub.broadcast(ChatServer.PubSub, channel_list_topic(user_id, server_id), message)
   end
-
 
   def chat_topic(channel_id) do
     "channel:#{channel_id}"
@@ -85,10 +83,12 @@ defmodule ChatServer.Servers do
       [%Channel{}, ...]
 
   """
-  def list_users_belonging_to_server(server_id) when is_number(server_id) or is_binary(server_id) do
+  def list_users_belonging_to_server(server_id)
+      when is_number(server_id) or is_binary(server_id) do
     from(
       u in User,
-      join: su in ServerUser, on: su.user_id == u.id,
+      join: su in ServerUser,
+      on: su.user_id == u.id,
       where: su.server_id == ^server_id,
       order_by: [asc: u.username]
     )
@@ -118,12 +118,25 @@ defmodule ChatServer.Servers do
 
   """
   def search_servers(query, amount) do
-    query = from(
-      s in Server,
-      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
-      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
-      limit: ^amount
-    )
+    query =
+      from(
+        s in Server,
+        where:
+          fragment(
+            "? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75",
+            s.full_text_search,
+            ^query
+          ),
+        order_by: [
+          asc:
+            fragment(
+              "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+              s.full_text_search,
+              ^query
+            )
+        ],
+        limit: ^amount
+      )
 
     Repo.all(query)
   end
@@ -138,26 +151,53 @@ defmodule ChatServer.Servers do
 
   """
   def search_servers_previous(query, last_server_id, page_size) do
-    all_row_numbers = from(
-      s in Server,
-      select: %{id: s.id, row_number: row_number() |> over(order_by: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query))},
-      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
-      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
-    )
+    all_row_numbers =
+      from(
+        s in Server,
+        select: %{
+          id: s.id,
+          row_number:
+            row_number()
+            |> over(
+              order_by:
+                fragment(
+                  "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+                  s.full_text_search,
+                  ^query
+                )
+            )
+        },
+        where:
+          fragment(
+            "? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75",
+            s.full_text_search,
+            ^query
+          ),
+        order_by: [
+          asc:
+            fragment(
+              "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+              s.full_text_search,
+              ^query
+            )
+        ]
+      )
 
-    single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
-    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
-    |> where([_s, rn], rn.id == ^last_server_id)
-    |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
+    single_row_number =
+      with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+      |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+      |> where([_s, rn], rn.id == ^last_server_id)
+      |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
 
-    query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
-    |> with_cte("single_row_number", as: ^single_row_number)
-    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
-    |> join(:left, [s, rn], srn in "single_row_number", on: true)
-    |> where([s, rn, srn], rn.row_number < srn.row_number)
-    |> select([s, _rn, _srn], s)
-    |> order_by([s], [desc: s.name])
-    |> limit(^page_size)
+    query =
+      with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+      |> with_cte("single_row_number", as: ^single_row_number)
+      |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+      |> join(:left, [s, rn], srn in "single_row_number", on: true)
+      |> where([s, rn, srn], rn.row_number < srn.row_number)
+      |> select([s, _rn, _srn], s)
+      |> order_by([s], desc: s.name)
+      |> limit(^page_size)
 
     Repo.all(query)
   end
@@ -172,28 +212,100 @@ defmodule ChatServer.Servers do
 
   """
   def search_servers_next(query, last_server_id, page_size) do
-    all_row_numbers = from(
-      s in Server,
-      select: %{id: s.id, row_number: row_number() |> over(order_by: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query))},
-      where: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75", s.full_text_search, ^query),
-      order_by: [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)],
-    )
+    all_row_numbers =
+      from(
+        s in Server,
+        select: %{
+          id: s.id,
+          row_number:
+            row_number()
+            |> over(
+              order_by:
+                fragment(
+                  "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+                  s.full_text_search,
+                  ^query
+                )
+            )
+        },
+        where:
+          fragment(
+            "? <@> to_bm25query(?, 'servers_full_text_search_bm25') < 0.75",
+            s.full_text_search,
+            ^query
+          ),
+        order_by: [
+          asc:
+            fragment(
+              "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+              s.full_text_search,
+              ^query
+            )
+        ]
+      )
 
-    single_row_number = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
-    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
-    |> where([_s, rn], rn.id == ^last_server_id)
-    |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
+    single_row_number =
+      with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+      |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+      |> where([_s, rn], rn.id == ^last_server_id)
+      |> select([s, rn], %{id: rn.id, row_number: rn.row_number})
 
-    query = with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
-    |> with_cte("single_row_number", as: ^single_row_number)
-    |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
-    |> join(:left, [s, rn], srn in "single_row_number", on: true)
-    |> where([s, rn, srn], rn.row_number > srn.row_number)
-    |> select([s, _rn, _srn], s)
-    |> order_by([s], [asc: fragment("? <@> to_bm25query(?, 'servers_full_text_search_bm25') ", s.full_text_search, ^query)])
-    |> limit(^page_size)
+    query =
+      with_cte(Server, "all_row_numbers", as: ^all_row_numbers)
+      |> with_cte("single_row_number", as: ^single_row_number)
+      |> join(:inner, [s], rn in "all_row_numbers", on: rn.id == s.id)
+      |> join(:left, [s, rn], srn in "single_row_number", on: true)
+      |> where([s, rn, srn], rn.row_number > srn.row_number)
+      |> select([s, _rn, _srn], s)
+      |> order_by([s],
+        asc:
+          fragment(
+            "? <@> to_bm25query(?, 'servers_full_text_search_bm25') ",
+            s.full_text_search,
+            ^query
+          )
+      )
+      |> limit(^page_size)
 
     Repo.all(query)
+  end
+
+  @doc """
+  Creates a server that belongs to a user
+
+  Returns Server user if successful.
+  """
+  def create_server(user_id, %{} = attrs) when is_number(user_id) or is_binary(user_id) do
+    Repo.transaction(fn ->
+      with {:ok, server} <-
+           %Server{}
+           |> Server.changeset(attrs)
+           |> Repo.insert(),
+         {:ok, server_user} <-
+           %ServerUser{}
+           |> ServerUser.changeset(%{user_id: user_id, server_id: server.id})
+           |> Repo.insert(),
+         {:ok, default_channel} <-
+           Channel.changeset(%Channel{}, %{
+             name: "General",
+             private: false,
+             is_default: true,
+             description: "A channel for general discussions.",
+             server_id: server_user.server_id
+           })
+           |> Repo.insert(),
+         {:ok, server_user} <-
+           ServerUser.changeset(server_user, %{
+             last_selected_channel_id: default_channel.id
+           })
+           |> Repo.update() do
+      server_user
+      |> Repo.preload(:user)
+      |> Repo.preload(:server)
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+   end)
   end
 
   @doc """
@@ -232,7 +344,6 @@ defmodule ChatServer.Servers do
     |> Repo.update()
   end
 
-
   @doc """
   Deletes a server.
 
@@ -248,7 +359,8 @@ defmodule ChatServer.Servers do
   def delete_server(server_id) when is_number(server_id) or is_binary(server_id) do
     from(
       m in Message,
-      join: c in Channel, on: c.id == m.channel_id,
+      join: c in Channel,
+      on: c.id == m.channel_id,
       where: c.server_id == ^server_id
     )
     |> Repo.delete_all()
@@ -313,14 +425,14 @@ defmodule ChatServer.Servers do
   def list_user_server_users(user_id) when is_number(user_id) do
     from(
       su in ServerUser,
-      join: s in Server, on: s.id == su.server_id,
+      join: s in Server,
+      on: s.id == su.server_id,
       where: su.user_id == ^user_id,
       preload: [:server],
       order_by: [asc: s.name]
     )
     |> Repo.all()
   end
-
 
   @doc """
   Gets a single message.
@@ -363,12 +475,17 @@ defmodule ChatServer.Servers do
       [%Message{}, ...]
 
   """
-  def list_latest_channel_messages(channel_id, limit) when is_number(channel_id) or is_binary(channel_id) do
-    from(m in Message, where: m.channel_id == ^channel_id, preload: [:user], limit: ^limit, order_by: [desc: m.id])
+  def list_latest_channel_messages(channel_id, limit)
+      when is_number(channel_id) or is_binary(channel_id) do
+    from(m in Message,
+      where: m.channel_id == ^channel_id,
+      preload: [:user],
+      limit: ^limit,
+      order_by: [desc: m.id]
+    )
     |> Repo.all()
     |> Enum.reverse()
   end
-
 
   @doc """
   Returns the list of a channel's around a specific message ID
@@ -382,26 +499,29 @@ defmodule ChatServer.Servers do
   def list_channel_messages_from_message_id(message_id, message_amount) do
     channel_id = Repo.get!(Message, message_id).channel_id
 
-    below = from(
-      m in Message,
-      where: m.channel_id == ^channel_id and m.id <= ^message_id,
-      order_by: [desc: m.id],
-      limit: ^message_amount
-    )
+    below =
+      from(
+        m in Message,
+        where: m.channel_id == ^channel_id and m.id <= ^message_id,
+        order_by: [desc: m.id],
+        limit: ^message_amount
+      )
 
-    above = from(
-      m in Message,
-      where: m.channel_id == ^channel_id and m.id > ^message_id,
-      order_by: [asc: m.id],
-      limit: ^message_amount
-    )
+    above =
+      from(
+        m in Message,
+        where: m.channel_id == ^channel_id and m.id > ^message_id,
+        order_by: [asc: m.id],
+        limit: ^message_amount
+      )
 
-    union = from(
-      m in subquery(union(subquery(below), ^above)),
-      order_by: [asc: m.id],
-      preload: [:user, :channel],
-      limit: ^message_amount
-    )
+    union =
+      from(
+        m in subquery(union(subquery(below), ^above)),
+        order_by: [asc: m.id],
+        preload: [:user, :channel],
+        limit: ^message_amount
+      )
 
     Repo.all(union)
   end
@@ -416,13 +536,14 @@ defmodule ChatServer.Servers do
 
   """
   def list_channel_messages_previous(channel_id, last_message_id, message_amount) do
-    query = from(
-      m in Message,
-      where: m.channel_id == ^channel_id and m.id < ^last_message_id,
-      preload: [:user],
-      order_by: [desc: m.id],
-      limit: ^message_amount
-    )
+    query =
+      from(
+        m in Message,
+        where: m.channel_id == ^channel_id and m.id < ^last_message_id,
+        preload: [:user],
+        order_by: [desc: m.id],
+        limit: ^message_amount
+      )
 
     Repo.all(query)
   end
@@ -437,13 +558,14 @@ defmodule ChatServer.Servers do
 
   """
   def list_channel_messages_next(channel_id, last_message_id, message_amount) do
-    query = from(
-      m in Message,
-      where: m.channel_id == ^channel_id and m.id > ^last_message_id,
-      preload: [:user],
-      order_by: [asc: m.id],
-      limit: ^message_amount
-    )
+    query =
+      from(
+        m in Message,
+        where: m.channel_id == ^channel_id and m.id > ^last_message_id,
+        preload: [:user],
+        order_by: [asc: m.id],
+        limit: ^message_amount
+      )
 
     Repo.all(query)
   end
@@ -478,17 +600,22 @@ defmodule ChatServer.Servers do
 
   """
   def search_messages(query, amount) do
-    query = from(
-      m in Message,
-      where: fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query),
-      preload: [:user, :channel],
-      order_by: [desc: m.id],
-      limit: ^amount
-    )
+    query =
+      from(
+        m in Message,
+        where:
+          fragment(
+            "? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0",
+            m.message,
+            ^query
+          ),
+        preload: [:user, :channel],
+        order_by: [desc: m.id],
+        limit: ^amount
+      )
 
     Repo.all(query)
   end
-
 
   @doc """
   Returns the previous page a paginated list of messages matching the search query.
@@ -500,13 +627,20 @@ defmodule ChatServer.Servers do
 
   """
   def search_messages_previous(query, last_message_id, message_amount) do
-    query = from(
-      m in Message,
-      where: m.id < ^last_message_id and (fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query)),
-      preload: [:user, :channel],
-      order_by: [desc: m.id],
-      limit: ^message_amount
-    )
+    query =
+      from(
+        m in Message,
+        where:
+          m.id < ^last_message_id and
+            fragment(
+              "? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0",
+              m.message,
+              ^query
+            ),
+        preload: [:user, :channel],
+        order_by: [desc: m.id],
+        limit: ^message_amount
+      )
 
     Repo.all(query)
   end
@@ -521,13 +655,20 @@ defmodule ChatServer.Servers do
 
   """
   def search_messages_next(query, last_message_id, message_amount) do
-    query = from(
-      m in Message,
-      where: m.id > ^last_message_id and (fragment("? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0", m.message, ^query)),
-      preload: [:user, :channel],
-      order_by: [asc: m.id],
-      limit: ^message_amount
-    )
+    query =
+      from(
+        m in Message,
+        where:
+          m.id > ^last_message_id and
+            fragment(
+              "? <@> to_bm25query(?, 'messages_full_text_search_bm25') < -1.0",
+              m.message,
+              ^query
+            ),
+        preload: [:user, :channel],
+        order_by: [asc: m.id],
+        limit: ^message_amount
+      )
 
     Repo.all(query)
   end
@@ -546,11 +687,11 @@ defmodule ChatServer.Servers do
       ** (Ecto.NoResultsError)
 
   """
-  def get_server_user!(server_user_id) when is_number(server_user_id) or is_binary(server_user_id) do
+  def get_server_user!(server_user_id)
+      when is_number(server_user_id) or is_binary(server_user_id) do
     Repo.get!(ServerUser, server_user_id)
     |> Repo.preload([:last_selected_channel, :server])
   end
-
 
   @doc """
   Gets a single server user record.
@@ -566,7 +707,9 @@ defmodule ChatServer.Servers do
       ** (Ecto.NoResultsError)
 
   """
-  def get_server_user_by_server_and_user!(server_user_id, user_id) when (is_number(server_user_id) or is_binary(server_user_id)) and (is_number(user_id) or is_binary(user_id)) do
+  def get_server_user_by_server_and_user!(server_user_id, user_id)
+      when (is_number(server_user_id) or is_binary(server_user_id)) and
+             (is_number(user_id) or is_binary(user_id)) do
     from(
       su in ServerUser,
       where: su.server_id == ^server_user_id and su.user_id == ^user_id,
@@ -587,13 +730,14 @@ defmodule ChatServer.Servers do
     server = Servers.get_server!(server_id)
     default_channel = Servers.get_server_default_channel!(server_id)
 
-    {:ok, server_user} = %ServerUser{}
-    |> ServerUser.changeset(%{
-      user_id: user_id,
-      server_id: server.id,
-      last_selected_channel_id: default_channel.id
-    })
-    |> Repo.insert()
+    {:ok, server_user} =
+      %ServerUser{}
+      |> ServerUser.changeset(%{
+        user_id: user_id,
+        server_id: server.id,
+        last_selected_channel_id: default_channel.id
+      })
+      |> Repo.insert()
 
     server_user
     |> Repo.preload(:server)
@@ -603,10 +747,12 @@ defmodule ChatServer.Servers do
   Delete the corresponding ServerUser record when a user leaves a server.
   """
   def leave_server(user_id, server_id) do
-    query = from(
-      su in ServerUser,
-      where: su.user_id == ^user_id and su.server_id == ^server_id
-    )
+    query =
+      from(
+        su in ServerUser,
+        where: su.user_id == ^user_id and su.server_id == ^server_id
+      )
+
     server_user = Repo.one(query)
     if server_user != nil, do: Repo.delete!(server_user)
   end
@@ -629,7 +775,6 @@ defmodule ChatServer.Servers do
     Repo.get!(Channel, channel_id)
   end
 
-
   @doc """
   Returns the list of a channels a user belongs to.
 
@@ -650,9 +795,10 @@ defmodule ChatServer.Servers do
   def create_channel(server_id, %{} = attrs) do
     attrs = Map.put(attrs, "server_id", server_id)
 
-    channel = %Channel{}
-    |> Channel.changeset(attrs)
-    |> Repo.insert()
+    channel =
+      %Channel{}
+      |> Channel.changeset(attrs)
+      |> Repo.insert()
 
     case channel do
       {:error, changeset} -> {:error, changeset}
@@ -753,18 +899,23 @@ defmodule ChatServer.Servers do
   @doc """
   Creates a message that belongs to a user
   """
-  def create_message(user_id, channel_id, %{} = attrs) when (is_number(user_id) or is_binary(user_id)) and (is_number(channel_id) or is_binary(channel_id))do
-    attrs = Map.put(attrs, "channel_id", channel_id)
-    |> Map.put("user_id", user_id)
+  def create_message(user_id, channel_id, %{} = attrs)
+      when (is_number(user_id) or is_binary(user_id)) and
+             (is_number(channel_id) or is_binary(channel_id)) do
+    attrs =
+      Map.put(attrs, "channel_id", channel_id)
+      |> Map.put("user_id", user_id)
 
-    {:ok, message} = %Message{}
-    |> Message.changeset(attrs)
-    |> Repo.insert()
+    result = %Message{}
+      |> Message.changeset(attrs)
+      |> Repo.insert()
 
-    message = message
-    |> Repo.preload([:user, :channel])
-
-    {:ok, message}
+    case result do
+      {:ok, message} ->
+        {:ok, Repo.preload(message, [:user, :channel])}
+      {:error, changeset} ->
+        {:error, changeset}
+    end
   end
 
   @doc """
