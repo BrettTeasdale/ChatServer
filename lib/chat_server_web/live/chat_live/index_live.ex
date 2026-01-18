@@ -88,8 +88,6 @@ defmodule ChatServerWeb.ChatLive.Index do
 
         Servers.chat_broadcast(channel_id, {:message_created, message})
 
-        IO.inspect(changeset, label: "Changeset after message created")
-
         {:noreply,  assign(socket, :message_form, to_form(changeset))}
 
       {:error, changeset} ->
