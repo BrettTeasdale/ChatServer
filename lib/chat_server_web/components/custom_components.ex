@@ -54,7 +54,7 @@ defmodule ChatServerWeb.CustomComponents do
             >
               <div
                 :if={@header}
-                class="flex shrink-0 items-center pb-4 text-xl font-medium border-b border-slate-700 text-base font-semibold text-white"
+                class="flex shrink-0 items-center pb-4 text-xl border-b border-slate-700 text-base font-semibold text-white"
               >
                 {render_slot(@header)}
               </div>
