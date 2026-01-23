@@ -278,34 +278,34 @@ defmodule ChatServer.Servers do
   def create_server(user_id, %{} = attrs) when is_number(user_id) or is_binary(user_id) do
     Repo.transaction(fn ->
       with {:ok, server} <-
-           %Server{}
-           |> Server.changeset(attrs)
-           |> Repo.insert(),
-         {:ok, server_user} <-
-           %ServerUser{}
-           |> ServerUser.changeset(%{user_id: user_id, server_id: server.id})
-           |> Repo.insert(),
-         {:ok, default_channel} <-
-           Channel.changeset(%Channel{}, %{
-             name: "General",
-             private: false,
-             is_default: true,
-             description: "A channel for general discussions.",
-             server_id: server_user.server_id
-           })
-           |> Repo.insert(),
-         {:ok, server_user} <-
-           ServerUser.changeset(server_user, %{
-             last_selected_channel_id: default_channel.id
-           })
-           |> Repo.update() do
-      server_user
-      |> Repo.preload(:user)
-      |> Repo.preload(:server)
+             %Server{}
+             |> Server.changeset(attrs)
+             |> Repo.insert(),
+           {:ok, server_user} <-
+             %ServerUser{}
+             |> ServerUser.changeset(%{user_id: user_id, server_id: server.id})
+             |> Repo.insert(),
+           {:ok, default_channel} <-
+             Channel.changeset(%Channel{}, %{
+               name: "General",
+               private: false,
+               is_default: true,
+               description: "A channel for general discussions.",
+               server_id: server_user.server_id
+             })
+             |> Repo.insert(),
+           {:ok, server_user} <-
+             ServerUser.changeset(server_user, %{
+               last_selected_channel_id: default_channel.id
+             })
+             |> Repo.update() do
+        server_user
+        |> Repo.preload(:user)
+        |> Repo.preload(:server)
       else
         {:error, changeset} -> Repo.rollback(changeset)
       end
-   end)
+    end)
   end
 
   @doc """
@@ -906,13 +906,15 @@ defmodule ChatServer.Servers do
       Map.put(attrs, "channel_id", channel_id)
       |> Map.put("user_id", user_id)
 
-    result = %Message{}
+    result =
+      %Message{}
       |> Message.changeset(attrs)
       |> Repo.insert()
 
     case result do
       {:ok, message} ->
         {:ok, Repo.preload(message, [:user, :channel])}
+
       {:error, changeset} ->
         {:error, changeset}
     end

@@ -83,12 +83,13 @@ defmodule ChatServerWeb.ChatLive.Index do
 
     case Servers.create_message(user.id, channel_id, message_params) do
       {:ok, message} ->
-        changeset = Servers.change_message(%Message{})
-        |> Map.put(:action, :validate)
+        changeset =
+          Servers.change_message(%Message{})
+          |> Map.put(:action, :validate)
 
         Servers.chat_broadcast(channel_id, {:message_created, message})
 
-        {:noreply,  assign(socket, :message_form, to_form(changeset))}
+        {:noreply, assign(socket, :message_form, to_form(changeset))}
 
       {:error, changeset} ->
         socket =
@@ -296,15 +297,10 @@ defmodule ChatServerWeb.ChatLive.Index do
     ## current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
 
     socket =
-      if !Map.get(bottom_message, :id) ||
-           Map.get(bottom_message, :id, 0) ==
-             Map.get(
-               Map.get(
-                 Map.get(socket.assigns.channel_page_data, message.channel_id),
-                 :bottom_message
-               ),
-               :id
-             ) do
+      if Map.get(bottom_message, :id) ||
+           get_in(socket.assigns, [:channel_page_data, message.channel_id, :bottom_message, :id]) do
+        socket
+      else
         new_channel_page_data_entry =
           Map.get(socket.assigns.channel_page_data, message.channel.id, %{})
           |> Map.put(:bottom_message, message)
@@ -329,8 +325,6 @@ defmodule ChatServerWeb.ChatLive.Index do
             new_channel_page_data_entry
           )
         )
-      else
-        socket
       end
 
     {:noreply, socket}
@@ -409,7 +403,9 @@ defmodule ChatServerWeb.ChatLive.Index do
           if(selected_channel.id == channel.id && messages != nil,
             do: messages,
             else: Map.get(latest_channel_messages, channel.id)
-          ), reset: true)
+          ),
+          reset: true
+        )
       end)
 
     if connected?(socket) do
