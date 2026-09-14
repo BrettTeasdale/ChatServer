@@ -1,7 +1,10 @@
 services:
   chat_server_postgresql:
     image: postgres-pgtextsearch
+    build: .
     restart: always
+    # pg_textsearch has to be preloaded or CREATE EXTENSION fails at migration time.
+    command: postgres -c shared_preload_libraries=pg_textsearch
     environment:
       POSTGRES_USER: ${POSTGRESQL_USERNAME}
       POSTGRES_PASSWORD: ${POSTGRESQL_PASSWORD}
@@ -10,4 +13,3 @@ services:
       - "${POSTGRESQL_PORT}:5432"
     volumes:
       - ./pgdata/:/var/lib/postgresql/
-
