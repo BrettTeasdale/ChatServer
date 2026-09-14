@@ -22,18 +22,30 @@ if System.get_env("PHX_SERVER") do
   config :chat_server, ChatServerWeb.Endpoint, server: true
 end
 
-if config_env() == :dev do
-  Dotenvy.source!(".env")
+if config_env() in [:dev, :test] do
+  # Database connection settings come from .env (see .env.example), which is
+  # shared with docker-compose.yml so the app and the container always agree.
+  # Real environment variables are layered on top and win over the file, and
+  # the file itself is optional so CI can supply everything via the environment.
+  # The defaults match a stock local Postgres.
+  Dotenvy.source!([".env", System.get_env()])
+
+  database = Dotenvy.env!("POSTGRESQL_DATABASE", :string, "chat_server")
+
+  # The MIX_TEST_PARTITION environment variable can be used to provide
+  # built-in test partitioning in CI. Run `mix help test` for more information.
+  database =
+    case config_env() do
+      :dev -> database
+      :test -> "#{database}_test#{System.get_env("MIX_TEST_PARTITION")}"
+    end
 
   config :chat_server, ChatServer.Repo,
-    username: Dotenvy.env!("POSTGRESQL_USERNAME", :string),
-    password: Dotenvy.env!("POSTGRESQL_PASSWORD", :string),
-    hostname: Dotenvy.env!("POSTGRESQL_HOSTNAME", :string),
-    database: Dotenvy.env!("POSTGRESQL_DATABASE", :string),
-    port: Dotenvy.env!("POSTGRESQL_PORT", :integer),
-    stacktrace: true,
-    show_sensitive_data_on_connection_error: true,
-    pool_size: 10
+    username: Dotenvy.env!("POSTGRESQL_USERNAME", :string, "postgres"),
+    password: Dotenvy.env!("POSTGRESQL_PASSWORD", :string, "postgres"),
+    hostname: Dotenvy.env!("POSTGRESQL_HOSTNAME", :string, "localhost"),
+    port: Dotenvy.env!("POSTGRESQL_PORT", :integer, 5432),
+    database: database
 end
 
 if config_env() == :prod do

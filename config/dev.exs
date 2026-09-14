@@ -1,12 +1,9 @@
 import Config
 
-# Configure your database
+# Configure your database.
+# Connection settings (username, password, host, port, database) are loaded
+# from .env in config/runtime.exs — see .env.example.
 config :chat_server, ChatServer.Repo,
-  username: "chat_server",
-  password: "eWFwdDGJMpDm2NYVJuxjpkcDK50NAgu6EAv",
-  hostname: "localhost",
-  database: "chat_server",
-  port: 5532,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10

@@ -286,46 +286,28 @@ defmodule ChatServerWeb.ChatLive.Index do
   end
 
   def handle_info({:message_created, %Message{} = message}, socket) do
-    # Update the last message that will be the relative anchor of our pagination
-    bottom_message =
-      Map.get(
-        Map.get(socket.assigns.channel_page_data, message.channel_id, %Message{}),
-        :bottom_message,
-        %Message{}
-      )
-
-    ## current_page = Map.get(socket.assigns.channel_page, message.channel_id, 0)
+    # Update the last message that will be the relative anchor of our pagination.
+    # The new message is always the newest in its channel, so it becomes the
+    # bottom anchor; it is also the top anchor if the channel was empty.
+    channel_page_data_entry =
+      socket.assigns.channel_page_data
+      |> Map.get(message.channel_id, %{})
+      |> Map.put(:bottom_message, message)
+      |> Map.update(:top_message, message, fn
+        %Message{id: nil} -> message
+        top_message -> top_message
+      end)
 
     socket =
-      if Map.get(bottom_message, :id) ||
-           get_in(socket.assigns, [:channel_page_data, message.channel_id, :bottom_message, :id]) do
-        socket
-      else
-        new_channel_page_data_entry =
-          Map.get(socket.assigns.channel_page_data, message.channel.id, %{})
-          |> Map.put(:bottom_message, message)
-
-        new_channel_page_data_entry =
-          if Map.get(new_channel_page_data_entry, :top_message) do
-            new_channel_page_data_entry
-          else
-            Map.put(new_channel_page_data_entry, :top_message, message)
-          end
-
-        socket
-        |> stream_insert("messages_#{message.channel.id}", message,
-          at: -1,
-          limit: -2 * socket.assigns.message_page_size
-        )
-        |> assign(
-          :channel_page_data,
-          Map.put(
-            socket.assigns.channel_page_data,
-            message.channel.id,
-            new_channel_page_data_entry
-          )
-        )
-      end
+      socket
+      |> stream_insert("messages_#{message.channel_id}", message,
+        at: -1,
+        limit: -2 * socket.assigns.message_page_size
+      )
+      |> assign(
+        :channel_page_data,
+        Map.put(socket.assigns.channel_page_data, message.channel_id, channel_page_data_entry)
+      )
 
     {:noreply, socket}
   end
